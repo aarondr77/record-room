@@ -62,6 +62,7 @@ export const getAccessTokenFromUrl = async () => {
   }
   
   try {
+    console.log('Exchanging code for token...', { code: code.substring(0, 20) + '...', redirect_uri: REDIRECT_URI });
     const response = await fetch(TOKEN_EXCHANGE_URL, {
       method: 'POST',
       headers: {
@@ -75,30 +76,213 @@ export const getAccessTokenFromUrl = async () => {
     });
     
     if (!response.ok) {
-      throw new Error('Failed to exchange code for token');
+      const errorText = await response.text();
+      console.error('Token exchange failed:', response.status, errorText);
+      throw new Error(`Failed to exchange code for token: ${response.status} - ${errorText}`);
     }
     
     const data = await response.json();
+    if (!data.access_token) {
+      throw new Error('Token exchange response missing access_token');
+    }
+    
     sessionStorage.removeItem('code_verifier');
+    console.log('Token exchange successful');
     return data.access_token;
   } catch (error) {
     console.error('Error exchanging code for token:', error);
+    sessionStorage.removeItem('code_verifier');
     throw error;
   }
 };
 
-export const fetchPlaylist = async (accessToken) => {
-  const response = await fetch(`https://api.spotify.com/v1/playlists/${PLAYLIST_ID}`, {
-    headers: {
-      'Authorization': `Bearer ${accessToken}`
+// Helper function to test API access
+export const testApiAccess = async (accessToken) => {
+  try {
+    const response = await fetch('https://api.spotify.com/v1/me', {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API test failed: ${response.status}`);
     }
-  });
+    
+    const userData = await response.json();
+    console.log('API access test successful. User:', userData.display_name || userData.id);
+    return userData;
+  } catch (error) {
+    console.error('API access test failed:', error);
+    throw error;
+  }
+};
 
-  if (!response.ok) {
-    throw new Error('Failed to fetch playlist');
+// Fetch user's playlists to help find accessible ones
+export const fetchUserPlaylists = async (accessToken) => {
+  try {
+    // Fetch all playlists (including collaborative ones)
+    let allPlaylists = [];
+    let nextUrl = 'https://api.spotify.com/v1/me/playlists?limit=50';
+    
+    while (nextUrl) {
+      const response = await fetch(nextUrl, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch playlists: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      allPlaylists = [...allPlaylists, ...data.items];
+      nextUrl = data.next;
+    }
+    
+    return allPlaylists;
+  } catch (error) {
+    console.error('Error fetching user playlists:', error);
+    throw error;
+  }
+};
+
+// Search for playlists by name
+export const searchPlaylists = async (accessToken, query) => {
+  try {
+    const response = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=playlist&limit=20`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to search playlists: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.playlists.items;
+  } catch (error) {
+    console.error('Error searching playlists:', error);
+    throw error;
+  }
+};
+
+// Try to access a playlist directly (useful for blend/collaborative playlists)
+export const tryAccessPlaylist = async (accessToken, playlistId) => {
+  try {
+    // Try the standard endpoint
+    const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      }
+    });
+    
+    if (response.ok) {
+      return await response.json();
+    }
+    
+    // If 404, try with market parameter (sometimes needed for certain playlists)
+    if (response.status === 404) {
+      const responseWithMarket = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}?market=from_token`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+      
+      if (responseWithMarket.ok) {
+        return await responseWithMarket.json();
+      }
+    }
+    
+    throw new Error(`Failed to access playlist: ${response.status}`);
+  } catch (error) {
+    console.error('Error accessing playlist:', error);
+    throw error;
+  }
+};
+
+export const fetchPlaylist = async (accessToken, playlistId = null) => {
+  const targetPlaylistId = playlistId || PLAYLIST_ID;
+  
+  if (!targetPlaylistId) {
+    throw new Error('Playlist ID is not configured. Please set VITE_PLAYLIST_ID in your .env file.');
   }
 
-  return response.json();
+  // Test API access first
+  try {
+    await testApiAccess(accessToken);
+  } catch (error) {
+    throw new Error(`Cannot access Spotify API: ${error.message}. Please reconnect to Spotify.`);
+  }
+
+  console.log(`Attempting to fetch playlist: ${targetPlaylistId}`);
+  
+  // Try to access the playlist with different methods
+  try {
+    const playlist = await tryAccessPlaylist(accessToken, targetPlaylistId);
+    return playlist;
+  } catch (error) {
+    // If direct access fails, try with more detailed error handling
+    const response = await fetch(`https://api.spotify.com/v1/playlists/${targetPlaylistId}`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = 'Failed to fetch playlist';
+      
+      if (response.status === 404) {
+        errorMessage = `Playlist not found (404). The playlist ID "${targetPlaylistId}" may be incorrect, or you may not have access to this playlist.`;
+        errorMessage += `\n\nNote: Some Spotify-generated playlists (like Daily Mix, Discover Weekly) may not be accessible via the API.`;
+        errorMessage += `\nBlend playlists should be accessible - make sure you're logged in with an account that has access to the blend.`;
+      } else if (response.status === 403) {
+        errorMessage = `Access forbidden (403). You may not have permission to access this playlist.`;
+      } else if (response.status === 401) {
+        errorMessage = `Unauthorized (401). Your access token may have expired. Please reconnect to Spotify.`;
+      } else {
+        errorMessage = `Failed to fetch playlist: ${response.status} - ${errorText}`;
+      }
+      
+      console.error('Playlist fetch error:', response.status, errorText);
+      throw new Error(errorMessage);
+    }
+
+    return await response.json();
+  }
+  
+  // Fetch all tracks (handle pagination)
+  let allTracks = [...playlist.tracks.items];
+  let nextUrl = playlist.tracks.next;
+  
+  // Keep fetching until there are no more pages
+  while (nextUrl) {
+    const tracksResponse = await fetch(nextUrl, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      }
+    });
+    
+    if (!tracksResponse.ok) {
+      console.warn('Failed to fetch additional tracks, returning what we have');
+      break;
+    }
+    
+    const tracksData = await tracksResponse.json();
+    allTracks = [...allTracks, ...tracksData.items];
+    nextUrl = tracksData.next;
+  }
+  
+  // Replace the tracks.items with all tracks
+  playlist.tracks.items = allTracks;
+  playlist.tracks.total = allTracks.length;
+  
+  console.log(`Fetched ${allTracks.length} tracks from playlist "${playlist.name}"`);
+  
+  return playlist;
 };
 
 export const playTrack = async (accessToken, trackUri, deviceId) => {
