@@ -76,21 +76,40 @@ export default function ControllableCat({ onInteract, partner = 'partner1' }) {
       let newFacing = facingRef.current
       let newDirection = movementDirectionRef.current
 
-      // Determine primary movement direction (prioritize horizontal over vertical)
-      if (keysPressed.current.has('ArrowLeft')) {
-        newX = Math.max(40, newX - speed)
+      // Check which directions are pressed
+      const left = keysPressed.current.has('ArrowLeft')
+      const right = keysPressed.current.has('ArrowRight')
+      const up = keysPressed.current.has('ArrowUp')
+      const down = keysPressed.current.has('ArrowDown')
+
+      // Determine if moving diagonally (for speed adjustment)
+      const isDiagonal = (left || right) && (up || down)
+      const adjustedSpeed = isDiagonal ? speed * 0.707 : speed // 1/√2 ≈ 0.707 for consistent diagonal speed
+
+      // Handle horizontal movement
+      if (left && !right) {
+        newX = Math.max(40, newX - adjustedSpeed)
         newFacing = 'left'
         newDirection = 'left'
-      } else if (keysPressed.current.has('ArrowRight')) {
-        newX = Math.min(window.innerWidth - 40, newX + speed)
+      } else if (right && !left) {
+        newX = Math.min(window.innerWidth - 40, newX + adjustedSpeed)
         newFacing = 'right'
         newDirection = 'right'
-      } else if (keysPressed.current.has('ArrowUp')) {
-        newY = Math.max(40, newY - speed)
-        newDirection = 'up'
-      } else if (keysPressed.current.has('ArrowDown')) {
-        newY = Math.min(window.innerHeight - 40, newY + speed)
-        newDirection = 'down'
+      }
+
+      // Handle vertical movement (can happen simultaneously with horizontal)
+      if (up && !down) {
+        newY = Math.max(40, newY - adjustedSpeed)
+        // Only update direction to up/down if not moving horizontally
+        if (!left && !right) {
+          newDirection = 'up'
+        }
+      } else if (down && !up) {
+        newY = Math.min(window.innerHeight - 40, newY + adjustedSpeed)
+        // Only update direction to up/down if not moving horizontally
+        if (!left && !right) {
+          newDirection = 'down'
+        }
       }
 
       // Update refs
@@ -163,75 +182,127 @@ export default function ControllableCat({ onInteract, partner = 'partner1' }) {
         xmlns="http://www.w3.org/2000/svg"
         className="cat-svg"
       >
-        {/* Cat head */}
-        <circle
-          cx="50"
-          cy="40"
-          r="25"
-          fill="none"
-          stroke="var(--cat-color)"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        
-        {/* Cat ears */}
-        <path
-          d="M 35 25 L 30 10 L 40 20 Z"
-          fill="none"
-          stroke="var(--cat-color)"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M 65 25 L 70 10 L 60 20 Z"
-          fill="none"
-          stroke="var(--cat-color)"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        
-        {/* Cat eyes */}
-        <circle
-          cx="42"
-          cy="38"
-          r="3"
-          fill="var(--eye-color)"
-        />
-        <circle
-          cx="58"
-          cy="38"
-          r="3"
-          fill="var(--eye-color)"
-        />
-        
-        {/* Cat nose */}
-        <path
-          d="M 50 45 L 47 50 L 53 50 Z"
-          fill="none"
-          stroke="var(--cat-color)"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        
-        {/* Cat mouth */}
-        <path
-          d="M 50 50 Q 45 55 42 52"
-          fill="none"
-          stroke="var(--cat-color)"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-        />
-        <path
-          d="M 50 50 Q 55 55 58 52"
-          fill="none"
-          stroke="var(--cat-color)"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-        />
+        {/* Cat head group - for bobbing animation */}
+        <g className="cat-head">
+          <circle
+            cx="50"
+            cy="40"
+            r="25"
+            fill="none"
+            stroke="var(--cat-color)"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          
+          {/* Cat ears */}
+          <g className="cat-ears">
+            <path
+              d="M 35 25 L 30 10 L 40 20 Z"
+              fill="none"
+              stroke="var(--cat-color)"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M 65 25 L 70 10 L 60 20 Z"
+              fill="none"
+              stroke="var(--cat-color)"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </g>
+          
+          {/* Cat eyes */}
+          <circle
+            cx="42"
+            cy="38"
+            r="3"
+            fill="var(--eye-color)"
+          />
+          <circle
+            cx="58"
+            cy="38"
+            r="3"
+            fill="var(--eye-color)"
+          />
+          
+          {/* Cat nose */}
+          <path
+            d="M 50 45 L 47 50 L 53 50 Z"
+            fill="none"
+            stroke="var(--cat-color)"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          
+          {/* Cat mouth */}
+          <path
+            d="M 50 50 Q 45 55 42 52"
+            fill="none"
+            stroke="var(--cat-color)"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+          <path
+            d="M 50 50 Q 55 55 58 52"
+            fill="none"
+            stroke="var(--cat-color)"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+          
+          {/* Cat whiskers */}
+          <g className="cat-whiskers">
+            {/* Left whiskers */}
+            <path
+              d="M 38 46 L 20 42"
+              fill="none"
+              stroke="var(--cat-color)"
+              strokeWidth="1"
+              strokeLinecap="round"
+            />
+            <path
+              d="M 38 48 L 18 48"
+              fill="none"
+              stroke="var(--cat-color)"
+              strokeWidth="1"
+              strokeLinecap="round"
+            />
+            <path
+              d="M 38 50 L 20 54"
+              fill="none"
+              stroke="var(--cat-color)"
+              strokeWidth="1"
+              strokeLinecap="round"
+            />
+            {/* Right whiskers */}
+            <path
+              d="M 62 46 L 80 42"
+              fill="none"
+              stroke="var(--cat-color)"
+              strokeWidth="1"
+              strokeLinecap="round"
+            />
+            <path
+              d="M 62 48 L 82 48"
+              fill="none"
+              stroke="var(--cat-color)"
+              strokeWidth="1"
+              strokeLinecap="round"
+            />
+            <path
+              d="M 62 50 L 80 54"
+              fill="none"
+              stroke="var(--cat-color)"
+              strokeWidth="1"
+              strokeLinecap="round"
+            />
+          </g>
+        </g>
         
         {/* Cat body */}
         <ellipse
@@ -248,7 +319,7 @@ export default function ControllableCat({ onInteract, partner = 'partner1' }) {
         
         {/* Cat tail - points away from movement direction, stays in last position when stopped */}
         {/* For horizontal movement: always draw tail on left side - scaleX flip handles showing it correctly */}
-        <g>
+        <g className="cat-tail">
           {(movementDirection === 'left' || movementDirection === 'right') && (
             // Horizontal movement - tail drawn on left, scaleX flip makes it appear on correct side
             <path
@@ -284,23 +355,27 @@ export default function ControllableCat({ onInteract, partner = 'partner1' }) {
           )}
         </g>
         
-        {/* Cat paws */}
-        <circle
-          cx="35"
-          cy="80"
-          r="4"
-          fill="none"
-          stroke="var(--cat-color)"
-          strokeWidth="1.5"
-        />
-        <circle
-          cx="65"
-          cy="80"
-          r="4"
-          fill="none"
-          stroke="var(--cat-color)"
-          strokeWidth="1.5"
-        />
+        {/* Cat paws - animated alternately */}
+        <g className="cat-paw-front">
+          <circle
+            cx="35"
+            cy="82"
+            r="5"
+            fill="none"
+            stroke="var(--cat-color)"
+            strokeWidth="1.5"
+          />
+        </g>
+        <g className="cat-paw-back">
+          <circle
+            cx="65"
+            cy="82"
+            r="5"
+            fill="none"
+            stroke="var(--cat-color)"
+            strokeWidth="1.5"
+          />
+        </g>
       </svg>
       
       {/* Interaction indicator */}

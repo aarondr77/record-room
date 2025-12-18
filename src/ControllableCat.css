@@ -2,27 +2,133 @@
   position: fixed;
   pointer-events: none;
   z-index: 1000;
-  transition: transform 0.1s ease-out;
   transform-origin: center;
-  will-change: transform;
+  will-change: transform, left, top;
 }
 
 .controllable-cat.moving .cat-svg {
-  animation: cat-walk 0.3s ease-in-out infinite;
+  animation: cat-bounce 0.2s ease-in-out infinite;
 }
 
-@keyframes cat-walk {
+/* Body bounce while walking */
+@keyframes cat-bounce {
   0%, 100% {
-    transform: translateY(0px);
+    transform: translateY(0px) scaleY(1);
   }
   50% {
-    transform: translateY(-2px);
+    transform: translateY(-3px) scaleY(0.97);
+  }
+}
+
+/* Front paw animation */
+.controllable-cat.moving .cat-paw-front {
+  animation: paw-front 0.2s ease-in-out infinite;
+  transform-origin: center top;
+}
+
+@keyframes paw-front {
+  0%, 100% {
+    transform: translateX(0) translateY(0);
+  }
+  25% {
+    transform: translateX(3px) translateY(-4px);
+  }
+  50% {
+    transform: translateX(0) translateY(0);
+  }
+  75% {
+    transform: translateX(-2px) translateY(-2px);
+  }
+}
+
+/* Back paw animation - offset from front */
+.controllable-cat.moving .cat-paw-back {
+  animation: paw-back 0.2s ease-in-out infinite;
+  transform-origin: center top;
+}
+
+@keyframes paw-back {
+  0%, 100% {
+    transform: translateX(0) translateY(0);
+  }
+  25% {
+    transform: translateX(-2px) translateY(-2px);
+  }
+  50% {
+    transform: translateX(0) translateY(0);
+  }
+  75% {
+    transform: translateX(3px) translateY(-4px);
+  }
+}
+
+/* Tail wagging while moving */
+.controllable-cat.moving .cat-tail {
+  animation: tail-wag 0.3s ease-in-out infinite;
+  transform-origin: 30px 70px;
+}
+
+@keyframes tail-wag {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(8deg);
+  }
+  75% {
+    transform: rotate(-8deg);
+  }
+}
+
+/* Head bob */
+.controllable-cat.moving .cat-head {
+  animation: head-bob 0.2s ease-in-out infinite;
+  transform-origin: center bottom;
+}
+
+@keyframes head-bob {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-1px) rotate(2deg);
+  }
+}
+
+/* Ear twitch */
+.controllable-cat.moving .cat-ears {
+  animation: ear-twitch 0.4s ease-in-out infinite;
+  transform-origin: center bottom;
+}
+
+@keyframes ear-twitch {
+  0%, 100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(0.9);
+  }
+}
+
+/* Whisker twitch */
+.controllable-cat.moving .cat-whiskers {
+  animation: whisker-twitch 0.15s ease-in-out infinite;
+  transform-origin: center;
+}
+
+@keyframes whisker-twitch {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(2deg);
   }
 }
 
 .cat-svg {
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
   display: block;
+  overflow: visible;
 }
 
 .cat-interaction-hint {
@@ -47,4 +153,3 @@
 .controllable-cat:hover .cat-interaction-hint {
   opacity: 1;
 }
-
