@@ -1,0 +1,50 @@
+.controllable-cat {
+  position: fixed;
+  pointer-events: none;
+  z-index: 1000;
+  transition: transform 0.1s ease-out;
+  transform-origin: center;
+  will-change: transform;
+}
+
+.controllable-cat.moving .cat-svg {
+  animation: cat-walk 0.3s ease-in-out infinite;
+}
+
+@keyframes cat-walk {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+.cat-svg {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+  display: block;
+}
+
+.cat-interaction-hint {
+  position: absolute;
+  top: -25px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2c2c2c;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+  font-family: 'Comic Sans MS', 'Chalkboard SE', 'Comic Neue', sans-serif;
+  box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.2);
+}
+
+.controllable-cat:hover .cat-interaction-hint {
+  opacity: 1;
+}
+

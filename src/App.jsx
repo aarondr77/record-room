@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import './App.css'
 import { getAuthUrl, getAccessTokenFromUrl, fetchPlaylist } from './spotify'
 import { getNotesForTrack, getAllNotes, addTextNote as apiAddTextNote, addVoiceNote as apiAddVoiceNote, deleteNote as apiDeleteNote } from './api'
-import AnimatedCat from './AnimatedCat'
+import ControllableCat from './ControllableCat'
 import VoiceNotePlayer from './VoiceNotePlayer'
 
 function App() {
@@ -409,11 +409,72 @@ function App() {
     })
   }
 
+  // Cat interaction handler - memoized to prevent re-renders
+  // Must be defined before any early returns to follow Rules of Hooks
+  const handleCatInteract = useCallback((catPosition) => {
+    if (!playlist) return // Early return if no playlist
+    
+    const interactionRadius = 80 // pixels
+    
+    // Find all interactive elements
+    const interactiveElements = document.querySelectorAll('[data-cat-interactive]')
+    
+    for (const element of interactiveElements) {
+      const rect = element.getBoundingClientRect()
+      const elementCenter = {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2
+      }
+      
+      const distance = Math.sqrt(
+        Math.pow(catPosition.x - elementCenter.x, 2) + 
+        Math.pow(catPosition.y - elementCenter.y, 2)
+      )
+      
+      if (distance < interactionRadius) {
+        // Trigger the interaction
+        const action = element.getAttribute('data-cat-action')
+        const trackIndex = element.getAttribute('data-track-index')
+        const trackUri = element.getAttribute('data-track-uri')
+        const trackId = element.getAttribute('data-track-id')
+        
+        if (action === 'play' && trackUri && player) {
+          const isPlayingTrack = currentTrack?.uri === trackUri && isPlaying
+          isPlayingTrack ? player.togglePlay() : handlePlay(trackUri)
+        } else if (action === 'expand' && trackId) {
+          setExpandedTrack(expandedTrack === trackId ? null : trackId)
+        } else if (action === 'send-note' && trackId) {
+          if (newMessage.trim()) {
+            addTextNote(trackId)
+          }
+        } else if (action === 'start-recording' && trackId) {
+          if (!isRecording) {
+            startRecording()
+          }
+        } else if (action === 'stop-recording') {
+          if (isRecording) {
+            stopRecording()
+          }
+        } else if (action === 'voice-play') {
+          // Voice note play button - click it
+          element.click()
+        }
+        
+        // Visual feedback
+        element.style.transform = 'scale(0.95)'
+        setTimeout(() => {
+          element.style.transform = ''
+        }, 100)
+        
+        break // Only interact with the first nearby element
+      }
+    }
+  }, [playlist, player, currentTrack, isPlaying, expandedTrack, newMessage, addTextNote, isRecording, startRecording, stopRecording, handlePlay])
+
   // User Selection Screen
   if (!currentUser) {
     return (
       <div className="app">
-        <AnimatedCat />
         <header>
           <h1>Our Shared Songs 💕</h1>
           <p>Who's listening today?</p>
@@ -440,7 +501,6 @@ function App() {
   if (!accessToken) {
     return (
       <div className="app">
-        <AnimatedCat />
         <header>
           <h1>Our Shared Songs 💕</h1>
           <p>A place for us to share and talk about our favorite music</p>
@@ -462,7 +522,6 @@ function App() {
   if (!playlist) {
     return (
       <div className="app">
-        <AnimatedCat />
         <header>
           <h1>Our Shared Songs 💕</h1>
         </header>
@@ -492,7 +551,13 @@ function App() {
 
   return (
     <div className="app">
-      <AnimatedCat />
+      {playlist && (
+        <ControllableCat 
+          key={currentUser} // Only remount if user changes
+          onInteract={handleCatInteract}
+          partner={currentUser === 'Partner 1' ? 'partner1' : 'partner2'}
+        />
+      )}
       <header>
         <h1>Our Shared Songs 💕</h1>
         <p>{playlist.name} • {playlist.tracks.items.length} tracks</p>
@@ -512,7 +577,13 @@ function App() {
 
             return (
               <div key={index} className={`track-card ${isExpanded ? 'expanded' : ''} ${isTrackPlaying(item.track.uri) ? 'playing' : ''}`}>
-                <div className="track-main" onClick={() => setExpandedTrack(isExpanded ? null : trackId)}>
+                <div 
+                  className="track-main" 
+                  onClick={() => setExpandedTrack(isExpanded ? null : trackId)}
+                  data-cat-interactive
+                  data-cat-action="expand"
+                  data-track-id={trackId}
+                >
                   <img
                     src={item.track.album.images[0]?.url}
                     alt={item.track.name}
@@ -536,6 +607,9 @@ function App() {
                     }}
                     disabled={!deviceId}
                     style={{ opacity: deviceId ? 1 : 0.5 }}
+                    data-cat-interactive
+                    data-cat-action="play"
+                    data-track-uri={item.track.uri}
                   >
                     {isTrackPlaying(item.track.uri) ? '⏸' : '▶'}
                   </button>
@@ -583,7 +657,12 @@ function App() {
                             <span className="recording-dot"></span>
                             Recording... {formatTime(recordingTime)}
                           </div>
-                          <button className="stop-record-btn" onClick={stopRecording}>
+                          <button 
+                            className="stop-record-btn" 
+                            onClick={stopRecording}
+                            data-cat-interactive
+                            data-cat-action="stop-recording"
+                          >
                             ⏹ Stop
                           </button>
                         </div>
@@ -610,6 +689,9 @@ function App() {
                                 className="send-btn-inside" 
                                 onClick={() => addTextNote(trackId)}
                                 title="Send message"
+                                data-cat-interactive
+                                data-cat-action="send-note"
+                                data-track-id={trackId}
                               >
                                 💌
                               </button>
@@ -618,6 +700,9 @@ function App() {
                                 className="mic-btn-inside" 
                                 onClick={startRecording}
                                 title="Record voice note"
+                                data-cat-interactive
+                                data-cat-action="start-recording"
+                                data-track-id={trackId}
                               >
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                   {/* Microphone body */}

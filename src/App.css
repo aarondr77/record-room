@@ -3,6 +3,20 @@
   box-sizing: border-box;
 }
 
+/* ===== CAT INTERACTION ===== */
+[data-cat-interactive] {
+  position: relative;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+[data-cat-interactive]:hover {
+  box-shadow: 0 0 0 3px rgba(155, 89, 182, 0.3) !important;
+}
+
+.note.partner2 [data-cat-interactive]:hover {
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.3) !important;
+}
+
 .app {
   min-height: 100vh;
   padding: 2rem;
