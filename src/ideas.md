@@ -6,6 +6,14 @@
 3. We can hide things in the garden for eachother. 
 4. This could keep evolving, I can start with a garden, then add a house and a whole new world for us to explore and share together. 
 
+
+# Trinkets to add
+1. Lobster toy
+2. Cat doing a pullup
+3. Cat laying on person's leg
+
+
+
 # IDE ideas
 1. I want to have a main agent (for the project) with a bunch of tasks. I think of this entire thing as one project. So I frequently notice myself starting a new taskpane when I finish a task (which I think is good practice that we want to encourage people to do), and then when I go back to the new taskpane, I want to say something like "Okay, now I want to do X". I want to kind of know where I am in the project and what I have already accomplished and where I want to go. 
 

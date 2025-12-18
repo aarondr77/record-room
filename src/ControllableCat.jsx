@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import './ControllableCat.css'
 
-export default function ControllableCat({ onInteract, partner = 'partner1' }) {
+export default function ControllableCat({ onInteract, partner = 'partner1', isPlaying = false, currentTrackUri = null }) {
   const catRef = useRef(null)
   const positionRef = useRef({ x: 100, y: 100 })
   const [position, setPosition] = useState({ x: 100, y: 100 })
@@ -10,6 +10,7 @@ export default function ControllableCat({ onInteract, partner = 'partner1' }) {
   const movementDirectionRef = useRef('right')
   const [movementDirection, setMovementDirection] = useState('right') // 'left', 'right', 'up', 'down'
   const [isMoving, setIsMoving] = useState(false)
+  const [isEating, setIsEating] = useState(false)
   const keysPressed = useRef(new Set())
   const animationFrameId = useRef(null)
   const speed = 3
@@ -17,6 +18,46 @@ export default function ControllableCat({ onInteract, partner = 'partner1' }) {
   // Partner-specific colors
   const catColor = partner === 'partner1' ? '#9b59b6' : '#3498db'
   const eyeColor = partner === 'partner1' ? '#7d3c98' : '#2874a6'
+
+  // Check if cat is near a playing bowl
+  useEffect(() => {
+    if (!isPlaying || !currentTrackUri) {
+      setIsEating(false)
+      return
+    }
+
+    const checkNearBowl = () => {
+      const bowls = document.querySelectorAll('[data-cat-action="play"]')
+      const eatingRadius = 60 // pixels
+      
+      for (const bowl of bowls) {
+        const trackUri = bowl.getAttribute('data-track-uri')
+        if (trackUri !== currentTrackUri) continue // Only check the playing track's bowl
+        
+        const rect = bowl.getBoundingClientRect()
+        const bowlCenter = {
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2
+        }
+        
+        const distance = Math.sqrt(
+          Math.pow(positionRef.current.x - bowlCenter.x, 2) + 
+          Math.pow(positionRef.current.y - bowlCenter.y, 2)
+        )
+        
+        if (distance < eatingRadius) {
+          setIsEating(true)
+          return
+        }
+      }
+      setIsEating(false)
+    }
+
+    // Check immediately and then periodically
+    checkNearBowl()
+    const interval = setInterval(checkNearBowl, 100)
+    return () => clearInterval(interval)
+  }, [isPlaying, currentTrackUri, position]) // position triggers re-check when cat moves
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -166,7 +207,7 @@ export default function ControllableCat({ onInteract, partner = 'partner1' }) {
   return (
     <div 
       ref={catRef}
-      className={`controllable-cat ${isMoving ? 'moving' : ''}`}
+      className={`controllable-cat ${isMoving ? 'moving' : ''} ${isEating ? 'eating' : ''}`}
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`,
@@ -240,20 +281,22 @@ export default function ControllableCat({ onInteract, partner = 'partner1' }) {
           />
           
           {/* Cat mouth */}
-          <path
-            d="M 50 50 Q 45 55 42 52"
-            fill="none"
-            stroke="var(--cat-color)"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-          <path
-            d="M 50 50 Q 55 55 58 52"
-            fill="none"
-            stroke="var(--cat-color)"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
+          <g className="cat-mouth">
+            <path
+              d="M 50 50 Q 45 55 42 52"
+              fill="none"
+              stroke="var(--cat-color)"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+            <path
+              d="M 50 50 Q 55 55 58 52"
+              fill="none"
+              stroke="var(--cat-color)"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+          </g>
           
           {/* Cat whiskers */}
           <g className="cat-whiskers">

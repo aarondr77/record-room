@@ -4,6 +4,7 @@ import { getAuthUrl, getAccessTokenFromUrl, fetchPlaylist } from './spotify'
 import { getNotesForTrack, getAllNotes, addTextNote as apiAddTextNote, addVoiceNote as apiAddVoiceNote, deleteNote as apiDeleteNote } from './api'
 import ControllableCat from './ControllableCat'
 import VoiceNotePlayer from './VoiceNotePlayer'
+import CatBowl from './CatBowl'
 
 function App() {
   const [accessToken, setAccessToken] = useState(null)
@@ -556,6 +557,8 @@ function App() {
           key={currentUser} // Only remount if user changes
           onInteract={handleCatInteract}
           partner={currentUser === 'Partner 1' ? 'partner1' : 'partner2'}
+          isPlaying={isPlaying}
+          currentTrackUri={currentTrack?.uri}
         />
       )}
       <header>
@@ -599,20 +602,18 @@ function App() {
                       <span className="note-count">{noteCount} {noteCount === 1 ? 'note' : 'notes'} 💬</span>
                     )}
                   </div>
-                  <button
-                    className="play-btn"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      isTrackPlaying(item.track.uri) ? player.togglePlay() : handlePlay(item.track.uri)
-                    }}
-                    disabled={!deviceId}
-                    style={{ opacity: deviceId ? 1 : 0.5 }}
+                  <div
                     data-cat-interactive
                     data-cat-action="play"
                     data-track-uri={item.track.uri}
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    {isTrackPlaying(item.track.uri) ? '⏸' : '▶'}
-                  </button>
+                    <CatBowl
+                      isPlaying={isTrackPlaying(item.track.uri)}
+                      onClick={() => isTrackPlaying(item.track.uri) ? player.togglePlay() : handlePlay(item.track.uri)}
+                      disabled={!deviceId}
+                    />
+                  </div>
                 </div>
 
                 {isExpanded && (
