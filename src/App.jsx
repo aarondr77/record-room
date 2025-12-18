@@ -6,7 +6,7 @@ import ControllableCat from './ControllableCat'
 import VoiceNotePlayer from './VoiceNotePlayer'
 import CatBowl from './CatBowl'
 import CatWindow from './CatWindow'
-import CatLegs from './CatLegs'
+import HumanLegs from './HumanLegs'
 
 function App() {
   const [accessToken, setAccessToken] = useState(null)
@@ -626,7 +626,7 @@ function App() {
                       />
                     )}
                     {index % 3 === 2 && (
-                      <CatLegs
+                      <HumanLegs
                         isPlaying={isTrackPlaying(item.track.uri)}
                         onClick={() => isTrackPlaying(item.track.uri) ? player.togglePlay() : handlePlay(item.track.uri)}
                         disabled={!deviceId}

@@ -1,6 +1,6 @@
-.cat-legs {
+.human-legs {
   width: 70px;
-  height: 60px;
+  height: 75px;
   padding: 0;
   border: none;
   background: transparent;
@@ -10,40 +10,26 @@
   flex-shrink: 0;
 }
 
-.cat-legs:hover:not(:disabled) {
+.human-legs:hover:not(:disabled) {
   transform: scale(1.05);
 }
 
-.cat-legs:active:not(:disabled) {
+.human-legs:active:not(:disabled) {
   transform: scale(0.95);
 }
 
-.cat-legs:disabled {
+.human-legs:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.legs-svg {
+.human-legs .legs-svg {
   display: block;
   overflow: visible;
 }
 
-/* Leg hair subtle movement when playing (like from cat purring) */
-.cat-legs.playing .leg-hair path {
-  animation: hair-wave 0.5s ease-in-out infinite;
-}
-
-@keyframes hair-wave {
-  0%, 100% {
-    transform: rotate(0deg);
-  }
-  50% {
-    transform: rotate(3deg);
-  }
-}
-
 /* Play icon pulse on hover */
-.cat-legs:hover:not(:disabled) .legs-icon circle {
+.human-legs:hover:not(:disabled) .legs-icon circle {
   animation: icon-glow 1s ease-in-out infinite;
 }
 
@@ -55,3 +41,4 @@
     filter: drop-shadow(0 0 6px rgba(29, 185, 84, 0.8));
   }
 }
+
