@@ -3,7 +3,12 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import multer from 'multer';
 import { v4 as uuidv4 } from 'uuid';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { dbOperations, storageOperations } from './supabase.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
@@ -259,7 +264,24 @@ app.delete('/api/notes/:noteId', async (req, res) => {
   }
 });
 
-app.listen(PORT, '127.0.0.1', () => {
-  console.log(`🚀 Server running on http://127.0.0.1:${PORT}`);
-  console.log(`📝 Notes API available at http://127.0.0.1:${PORT}/api/notes`);
+// Serve static files from Vite build in production
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, 'dist')));
+  // Fallback to index.html for client-side routing
+  app.get('*', (req, res) => {
+    // Don't serve static files for API routes
+    if (req.path.startsWith('/api')) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+  });
+}
+
+// Start server (for local dev and production hosting like Railway)
+const host = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1';
+app.listen(PORT, host, () => {
+  console.log(`🚀 Server running on http://${host}:${PORT}`);
+  console.log(`📝 Notes API available at http://${host}:${PORT}/api/notes`);
 });
+
+export default app;

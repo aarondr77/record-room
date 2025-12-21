@@ -10,6 +10,8 @@
 4. This could keep evolving, I can start with a garden, then add a house and a whole new world for us to explore and share together.
 
 
+# Features to add
+1. When one song finishes, play the next one instead of repeating the same song! 
 
 # Trinkets to add
 1. Lobster toy
@@ -23,7 +25,7 @@
 
 # 
 
-We could do the following for our notebook only mode: 
+We could do the following for our vibe-coding mode: 
 1. You can either display in IDE mode or agent mode. 
 2. In IDE mode it is left as is
 3. In agent mode, you get a split view of the chat taskpane and the rendered outputs. That is all. 

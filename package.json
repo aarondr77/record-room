@@ -8,6 +8,8 @@
     "server": "node server.js",
     "dev:all": "concurrently \"npm run dev\" \"npm run server\"",
     "build": "vite build",
+    "postbuild": "node -e \"require('fs').statSync('dist/index.html')\" || exit 1",
+    "start": "NODE_ENV=production node server.js",
     "lint": "eslint .",
     "preview": "vite preview"
   },

@@ -1,7 +1,9 @@
 const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
 const REDIRECT_URI = import.meta.env.VITE_SPOTIFY_REDIRECT_URI;
 const PLAYLIST_ID = import.meta.env.VITE_PLAYLIST_ID;
-const TOKEN_EXCHANGE_URL = import.meta.env.VITE_TOKEN_EXCHANGE_URL || 'http://127.0.0.1:3001/api/token';
+// In production (Vercel), API routes are at the same origin
+// In development, we use the local server
+const TOKEN_EXCHANGE_URL = import.meta.env.VITE_TOKEN_EXCHANGE_URL || (import.meta.env.PROD ? '/api/token' : 'http://127.0.0.1:3001/api/token');
 
 const SCOPES = [
   'playlist-read-private',

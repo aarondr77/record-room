@@ -1,4 +1,6 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:3001';
+// In production (Vercel), API routes are at the same origin
+// In development, we use the local server
+const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://127.0.0.1:3001');
 
 // Get all notes for a specific track
 export const getNotesForTrack = async (trackId) => {
