@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import './App.css'
-import { getAuthUrl, getAccessTokenFromUrl, fetchPlaylist } from './spotify'
+import { getAuthUrl, getAccessTokenFromUrl, fetchPlaylist, fetchUserProfile } from './spotify'
 import { getNotesForTrack, getAllNotes, addTextNote as apiAddTextNote, addVoiceNote as apiAddVoiceNote, deleteNote as apiDeleteNote } from './api'
 import ControllableCat from './ControllableCat'
 import VoiceNotePlayer from './VoiceNotePlayer'
@@ -24,7 +24,48 @@ function App() {
   const [newMessage, setNewMessage] = useState('')
   const [isRecording, setIsRecording] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
-  const [currentUser, setCurrentUser] = useState(() => localStorage.getItem('current_user') || null)
+  const [currentUser, setCurrentUser] = useState(() => {
+    const stored = localStorage.getItem('current_user')
+    if (!stored) return null
+    try {
+      const parsed = JSON.parse(stored)
+      // If it's the old format (just a string), return null to force re-fetch
+      if (typeof parsed === 'string') {
+        localStorage.removeItem('current_user')
+        return null
+      }
+      return parsed
+    } catch (e) {
+      // If parsing fails, clear it and return null
+      localStorage.removeItem('current_user')
+      return null
+    }
+  })
+  const [userProfile, setUserProfile] = useState(null)
+  
+  // Helper function to get user's display name (fallback to ID if no display name)
+  const getUserDisplayName = (user) => {
+    if (!user) return null
+    if (typeof user === 'string') return user
+    return user.displayName || user.id
+  }
+  
+  // Helper function to determine color style based on user ID or name
+  // This ensures consistent styling for each user (purple or blue)
+  const getUserColorStyle = (userIdOrName) => {
+    if (!userIdOrName) return 'partner1' // Default to partner1 for CSS class
+    // Simple hash to consistently assign color style
+    let hash = 0
+    for (let i = 0; i < userIdOrName.length; i++) {
+      hash = ((hash << 5) - hash) + userIdOrName.charCodeAt(i)
+      hash = hash & hash // Convert to 32bit integer
+    }
+    return hash % 2 === 0 ? 'partner1' : 'partner2'
+  }
+  
+  const getUserEmoji = (userIdOrName) => {
+    return getUserColorStyle(userIdOrName) === 'partner1' ? '💜' : '💙'
+  }
   
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
@@ -141,6 +182,16 @@ function App() {
           if (token) {
             setAccessToken(token)
             localStorage.setItem('spotify_access_token', token)
+            
+            // Fetch user profile
+            try {
+              const profile = await fetchUserProfile(token)
+              setUserProfile(profile)
+              setCurrentUser(profile)
+              localStorage.setItem('current_user', JSON.stringify(profile))
+            } catch (err) {
+              console.error('Failed to fetch user profile:', err)
+            }
           }
         } catch (err) {
           setError(err.message)
@@ -148,7 +199,30 @@ function App() {
         }
       } else {
         const savedToken = localStorage.getItem('spotify_access_token')
-        if (savedToken) setAccessToken(savedToken)
+        if (savedToken) {
+          setAccessToken(savedToken)
+          
+          // Try to load saved user profile
+          const savedUser = localStorage.getItem('current_user')
+          if (savedUser) {
+            try {
+              const profile = JSON.parse(savedUser)
+              setCurrentUser(profile)
+              setUserProfile(profile)
+            } catch (e) {
+              console.error('Failed to parse saved user:', e)
+            }
+          } else {
+            // Fetch user profile if not saved
+            fetchUserProfile(savedToken)
+              .then(profile => {
+                setUserProfile(profile)
+                setCurrentUser(profile)
+                localStorage.setItem('current_user', JSON.stringify(profile))
+              })
+              .catch(err => console.error('Failed to fetch user profile:', err))
+          }
+        }
       }
     }
     initAuth()
@@ -333,7 +407,8 @@ function App() {
     setNewMessage('') // Clear input immediately for better UX
     
     try {
-      const note = await apiAddTextNote(trackId, messageToSend, currentUser)
+      const authorName = getUserDisplayName(currentUser)
+      const note = await apiAddTextNote(trackId, messageToSend, authorName)
       
       // Optimistically update UI
       setTrackNotes(prev => ({
@@ -353,7 +428,8 @@ function App() {
     setRecordingTime(0)
     
     try {
-      const note = await apiAddVoiceNote(trackId, audioBlob, currentUser, duration)
+      const authorName = getUserDisplayName(currentUser)
+      const note = await apiAddVoiceNote(trackId, audioBlob, authorName, duration)
       
       // Optimistically update UI
       setTrackNotes(prev => ({
@@ -375,7 +451,8 @@ function App() {
     }))
     
     try {
-      await apiDeleteNote(noteId, currentUser)
+      const authorName = getUserDisplayName(currentUser)
+      await apiDeleteNote(noteId, authorName)
     } catch (err) {
       // Restore note on error
       setError(`Failed to delete note: ${err.message}`)
@@ -474,32 +551,6 @@ function App() {
     }
   }, [playlist, player, currentTrack, isPlaying, expandedTrack, newMessage, addTextNote, isRecording, startRecording, stopRecording, handlePlay])
 
-  // User Selection Screen
-  if (!currentUser) {
-    return (
-      <div className="app">
-        <header>
-          <h1>Our Shared Songs 💕</h1>
-          <p>Who's listening today?</p>
-        </header>
-        <main>
-          <div className="user-select">
-            <button className="user-btn" onClick={() => { setCurrentUser('Partner 1'); localStorage.setItem('current_user', 'Partner 1'); }}>
-              <span className="user-emoji">💜</span>
-              <span>Partner 1</span>
-            </button>
-            <span className="heart-divider">♥</span>
-            <button className="user-btn" onClick={() => { setCurrentUser('Partner 2'); localStorage.setItem('current_user', 'Partner 2'); }}>
-              <span className="user-emoji">💙</span>
-              <span>Partner 2</span>
-            </button>
-          </div>
-          <p className="switch-hint">You can switch anytime from the header</p>
-        </main>
-      </div>
-    )
-  }
-
   // Login screen
   if (!accessToken) {
     return (
@@ -535,7 +586,7 @@ function App() {
   }
 
   // Loading screen
-  if (!playlist) {
+  if (!playlist || !currentUser) {
     return (
       <div className="app">
         <header>
@@ -567,11 +618,11 @@ function App() {
 
   return (
     <div className="app">
-      {playlist && (
+      {playlist && currentUser && (
         <ControllableCat 
-          key={currentUser} // Only remount if user changes
+          key={currentUser.id} // Only remount if user changes
           onInteract={handleCatInteract}
-          partner={currentUser === 'Partner 1' ? 'partner1' : 'partner2'}
+          partner={getUserColorStyle(currentUser.id)}
           isPlaying={isPlaying}
           currentTrackUri={currentTrack?.uri}
         />
@@ -579,9 +630,6 @@ function App() {
       <header>
         <h1>Our Shared Songs 💕</h1>
         <p>{playlist.name} • {playlist.tracks.items.length} tracks</p>
-        <div className="current-user-badge" onClick={() => { setCurrentUser(null); localStorage.removeItem('current_user'); }}>
-          <span>{currentUser === 'Partner 1' ? '💜' : '💙'} {currentUser}</span>
-        </div>
         {!deviceId && <p style={{ fontSize: '14px', color: '#999', marginTop: '8px' }}>⏳ Player initializing...</p>}
       </header>
 
@@ -656,30 +704,42 @@ function App() {
                       ) : notes.length === 0 ? (
                         <p className="no-notes">No notes yet! Be the first to share your thoughts 💭</p>
                       ) : (
-                        notes.map(note => (
-                          <div key={note.id} className={`note ${note.author === 'Partner 1' ? 'partner1' : 'partner2'}`}>
-                            <div className="note-header">
-                              <span className="note-author">
-                                {note.author === 'Partner 1' ? '💜' : '💙'} {note.author}
-                              </span>
-                              <span className="note-time">{formatDate(note.timestamp)}</span>
-                              {note.author === currentUser && (
-                                <button className="delete-note" onClick={() => deleteNote(trackId, note.id)}>×</button>
+                        notes.map(note => {
+                          // Determine color style for note author using hash of author name
+                          const noteColorStyle = getUserColorStyle(note.author)
+                          const noteEmoji = getUserEmoji(note.author)
+                          const authorDisplayName = note.author // Already stored as display name or ID
+                          const isCurrentUser = currentUser && (
+                            note.author === currentUser.displayName || 
+                            note.author === currentUser.id ||
+                            note.author === getUserDisplayName(currentUser)
+                          )
+                          
+                          return (
+                            <div key={note.id} className={`note ${noteColorStyle}`}>
+                              <div className="note-header">
+                                <span className="note-author">
+                                  {noteEmoji} {authorDisplayName}
+                                </span>
+                                <span className="note-time">{formatDate(note.timestamp)}</span>
+                                {isCurrentUser && (
+                                  <button className="delete-note" onClick={() => deleteNote(trackId, note.id)}>×</button>
+                                )}
+                              </div>
+                              {note.type === 'text' ? (
+                                <p className="note-content">{note.content}</p>
+                              ) : (
+                                <div className="voice-note">
+                                  <VoiceNotePlayer 
+                                    src={note.content} 
+                                    duration={note.duration || 0} 
+                                    partner={noteColorStyle}
+                                  />
+                                </div>
                               )}
                             </div>
-                            {note.type === 'text' ? (
-                              <p className="note-content">{note.content}</p>
-                            ) : (
-                              <div className="voice-note">
-                                <VoiceNotePlayer 
-                                  src={note.content} 
-                                  duration={note.duration || 0} 
-                                  partner={note.author === 'Partner 1' ? 'partner1' : 'partner2'}
-                                />
-                              </div>
-                            )}
-                          </div>
-                        ))
+                          )
+                        })
                       )}
                     </div>
 
@@ -703,7 +763,7 @@ function App() {
                         <div className="unified-input-row">
                           <div className="textarea-wrapper">
                             <textarea
-                              placeholder={`What do you think, ${currentUser}?`}
+                              placeholder={`What do you think, ${getUserDisplayName(currentUser) || 'there'}?`}
                               value={newMessage}
                               onChange={(e) => setNewMessage(e.target.value)}
                               onKeyDown={(e) => {

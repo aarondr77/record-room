@@ -120,6 +120,31 @@ export const testApiAccess = async (accessToken) => {
   }
 };
 
+// Fetch user profile
+export const fetchUserProfile = async (accessToken) => {
+  try {
+    const response = await fetch('https://api.spotify.com/v1/me', {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch user profile: ${response.status}`);
+    }
+    
+    const userData = await response.json();
+    return {
+      id: userData.id,
+      displayName: userData.display_name || userData.id,
+      email: userData.email
+    };
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    throw error;
+  }
+};
+
 // Fetch user's playlists to help find accessible ones
 export const fetchUserPlaylists = async (accessToken) => {
   try {
