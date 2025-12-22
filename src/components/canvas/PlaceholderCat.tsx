@@ -97,17 +97,9 @@ function createInnerEarMaterial() {
 function createCatModel(): {
   group: Group;
   tail: Mesh | null;
-  frontLegs: { left: Mesh; right: Mesh } | null;
-  haunches: { left: Mesh; right: Mesh } | null;
-  body: Mesh | null;
 } {
   const catGroup = new Group();
   let tailMesh: Mesh | null = null;
-  let bodyMesh: Mesh | null = null;
-  let frontLegLeft: Mesh | null = null;
-  let frontLegRight: Mesh | null = null;
-  let haunchLeft: Mesh | null = null;
-  let haunchRight: Mesh | null = null;
   
   // === BODY (sitting cat - oval shaped, slightly tilted back) - BLACK ===
   const bodyGeometry = new SphereGeometry(0.18, 24, 16);
@@ -117,7 +109,6 @@ function createCatModel(): {
   body.rotation.x = -0.15; // Slight tilt back for sitting pose
   body.castShadow = true;
   body.receiveShadow = true;
-  bodyMesh = body;
   catGroup.add(body);
   
   // === CHEST/FRONT - WHITE (tuxedo marking) ===
@@ -250,14 +241,12 @@ function createCatModel(): {
   frontLeftLeg.position.set(-0.08, -0.02, 0.1);
   frontLeftLeg.castShadow = true;
   frontLeftLeg.receiveShadow = true;
-  frontLegLeft = frontLeftLeg;
   catGroup.add(frontLeftLeg);
   
   const frontRightLeg = new Mesh(frontLegGeometry, createBlackFurMaterial());
   frontRightLeg.position.set(0.08, -0.02, 0.1);
   frontRightLeg.castShadow = true;
   frontRightLeg.receiveShadow = true;
-  frontLegRight = frontRightLeg;
   catGroup.add(frontRightLeg);
   
   // === FRONT PAWS - WHITE (tuxedo "socks") ===
@@ -282,14 +271,12 @@ function createCatModel(): {
   leftHaunch.position.set(-0.1, 0.02, -0.05);
   leftHaunch.castShadow = true;
   leftHaunch.receiveShadow = true;
-  haunchLeft = leftHaunch;
   catGroup.add(leftHaunch);
   
   const rightHaunch = new Mesh(haunchGeometry, createBlackFurMaterial());
   rightHaunch.position.set(0.1, 0.02, -0.05);
   rightHaunch.castShadow = true;
   rightHaunch.receiveShadow = true;
-  haunchRight = rightHaunch;
   catGroup.add(rightHaunch);
   
   // === BACK PAWS (tucked under) - WHITE (tuxedo "socks") ===
@@ -336,9 +323,6 @@ function createCatModel(): {
   return {
     group: catGroup,
     tail: tailMesh,
-    body: bodyMesh,
-    frontLegs: frontLegLeft && frontLegRight ? { left: frontLegLeft, right: frontLegRight } : null,
-    haunches: haunchLeft && haunchRight ? { left: haunchLeft, right: haunchRight } : null,
   };
 }
 
@@ -346,19 +330,7 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
   const catRef = useRef<Group>(null);
   const tailRef = useRef<Mesh | null>(null);
   const { platform, recordIndex, facing, isMoving } = catState;
-  const partsRef = useRef<{
-    body: Mesh | null;
-    frontLegs: { left: Mesh; right: Mesh } | null;
-    haunches: { left: Mesh; right: Mesh } | null;
-    base?: {
-      body?: TransformSnapshot;
-      frontLegLeft?: TransformSnapshot;
-      frontLegRight?: TransformSnapshot;
-      haunchLeft?: TransformSnapshot;
-      haunchRight?: TransformSnapshot;
-      tail?: TransformSnapshot;
-    };
-  }>({ body: null, frontLegs: null, haunches: null });
+  const tailBaseRef = useRef<TransformSnapshot | null>(null);
 
   const jumpRef = useRef<{
     active: boolean;
@@ -380,28 +352,16 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
 
   // Create the procedural cat model
   const catModel = useMemo(() => {
-    const { group, tail, body, frontLegs, haunches } = createCatModel();
+    const { group, tail } = createCatModel();
     tailRef.current = tail;
-    partsRef.current.body = body;
-    partsRef.current.frontLegs = frontLegs;
-    partsRef.current.haunches = haunches;
     
     // Apply scale
     group.scale.set(CAT_SCALE, CAT_SCALE, CAT_SCALE);
 
-    // Capture base transforms for animation blending
-    const base: NonNullable<(typeof partsRef.current)['base']> = {};
-    if (partsRef.current.body) base.body = snapTransform(partsRef.current.body);
-    if (partsRef.current.frontLegs) {
-      base.frontLegLeft = snapTransform(partsRef.current.frontLegs.left);
-      base.frontLegRight = snapTransform(partsRef.current.frontLegs.right);
+    // Capture base transform for tail animation
+    if (tailRef.current) {
+      tailBaseRef.current = snapTransform(tailRef.current);
     }
-    if (partsRef.current.haunches) {
-      base.haunchLeft = snapTransform(partsRef.current.haunches.left);
-      base.haunchRight = snapTransform(partsRef.current.haunches.right);
-    }
-    if (tailRef.current) base.tail = snapTransform(tailRef.current);
-    partsRef.current.base = base;
     
     return group;
   }, []);
@@ -496,12 +456,10 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
         catRef.current.position.copy(tmpPos);
 
         // Tail whips more during jump
-        const parts = partsRef.current;
-        const base = parts.base;
         const pose = Math.sin(Math.PI * t); // For tail animation only
-        if (tailRef.current && base?.tail) {
-          tailRef.current.position.copy(base.tail.pos);
-          tailRef.current.rotation.copy(base.tail.rot);
+        if (tailRef.current && tailBaseRef.current) {
+          tailRef.current.position.copy(tailBaseRef.current.pos);
+          tailRef.current.rotation.copy(tailBaseRef.current.rot);
           tailRef.current.rotation.y += Math.sin(state.clock.elapsedTime * 9) * 0.55 * pose;
           tailRef.current.rotation.x += Math.sin(state.clock.elapsedTime * 7) * 0.2 * pose;
         }
@@ -511,9 +469,9 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
           jump.active = false;
           
           // Restore tail to base position
-          if (tailRef.current && base?.tail) {
-            tailRef.current.position.copy(base.tail.pos);
-            tailRef.current.rotation.copy(base.tail.rot);
+          if (tailRef.current && tailBaseRef.current) {
+            tailRef.current.position.copy(tailBaseRef.current.pos);
+            tailRef.current.rotation.copy(tailBaseRef.current.rot);
           }
         }
       } else {
@@ -526,10 +484,9 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
         // No rotation reset needed when idle
 
         // Idle tail sway + breathing
-        if (tailRef.current && partsRef.current.base?.tail) {
-          const baseTail = partsRef.current.base.tail;
-          tailRef.current.position.copy(baseTail.pos);
-          tailRef.current.rotation.copy(baseTail.rot);
+        if (tailRef.current && tailBaseRef.current) {
+          tailRef.current.position.copy(tailBaseRef.current.pos);
+          tailRef.current.rotation.copy(tailBaseRef.current.rot);
 
           const amp = isMoving ? 0.35 : 0.15;
           const spd = isMoving ? 4.5 : 1.2;
