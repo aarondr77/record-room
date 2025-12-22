@@ -1,29 +1,38 @@
 import { Platform } from '../types';
 
-// Even spacing grid system for 2D wall view
-// 3 columns x 3 rows = 9 slots (1 window + 8 shelves with 15 records)
+// 2-level shelf layout:
+// Row 0: WINDOW | RECORD | RECORD
+// Row 1: RECORD | RECORD | RECORD
 const COLUMNS = 3;
-const ROWS = 3;
+const ROWS = 2;
+const ITEM_SIZE = 2; // Size of each record/window
 const WALL_WIDTH = 10; // Total wall width in 3D units
-const WALL_HEIGHT = 7; // Total wall height in 3D units
-const HORIZONTAL_SPACING = WALL_WIDTH / (COLUMNS + 1);
-const VERTICAL_SPACING = WALL_HEIGHT / (ROWS + 1);
+const WALL_HEIGHT = 6; // Total wall height in 3D units
 
 // Calculate evenly spaced position
 function calculateEvenPosition(row: number, col: number): { x: number; y: number; z: number } {
-  // Center the grid on the wall
-  const startX = -(WALL_WIDTH / 2) + HORIZONTAL_SPACING;
-  const startY = (WALL_HEIGHT / 2) - VERTICAL_SPACING;
+  // Calculate center positions for evenly distributed items
+  const totalItemWidth = COLUMNS * ITEM_SIZE;
+  const totalItemHeight = ROWS * ITEM_SIZE;
+  const remainingWidth = WALL_WIDTH - totalItemWidth;
+  const remainingHeight = WALL_HEIGHT - totalItemHeight;
+  const gapWidth = remainingWidth / (COLUMNS + 1);
+  const gapHeight = remainingHeight / (ROWS + 1);
+  
+  // Calculate center position for each item
+  const startX = -(WALL_WIDTH / 2) + gapWidth + (ITEM_SIZE / 2);
+  const startY = (WALL_HEIGHT / 2) - gapHeight - (ITEM_SIZE / 2);
   
   return {
-    x: startX + col * HORIZONTAL_SPACING,
-    y: startY - row * VERTICAL_SPACING,
+    x: startX + col * (ITEM_SIZE + gapWidth),
+    y: startY - row * (ITEM_SIZE + gapHeight),
     z: 0.1, // Slightly in front of wall
   };
 }
 
-// Platform definitions - evenly spaced 3x3 grid
-// Window at top-left, then records distributed evenly across 8 shelves
+// Platform definitions - 2 rows, 3 columns
+// Row 0: WINDOW | RECORD | RECORD
+// Row 1: RECORD | RECORD | RECORD
 export const platforms: Record<number, Platform> = {
   // Row 0 (top)
   0: {
@@ -40,7 +49,7 @@ export const platforms: Record<number, Platform> = {
     position: calculateEvenPosition(0, 1),
     connections: { left: 0, right: 2, up: null, down: 4 },
     type: 'shelf',
-    records: [0, 1, 2],
+    records: [0],
   },
   2: {
     id: 2,
@@ -48,61 +57,36 @@ export const platforms: Record<number, Platform> = {
     position: calculateEvenPosition(0, 2),
     connections: { left: 1, right: null, up: null, down: 5 },
     type: 'shelf',
-    records: [3, 4],
+    records: [1],
   },
-  // Row 1 (middle)
+  // Row 1 (bottom)
   3: {
     id: 3,
     grid: { row: 1, col: 0 },
     position: calculateEvenPosition(1, 0),
-    connections: { left: null, right: 4, up: 0, down: 6 },
+    connections: { left: null, right: 4, up: 0, down: null },
     type: 'shelf',
-    records: [5, 6],
+    records: [2],
   },
   4: {
     id: 4,
     grid: { row: 1, col: 1 },
     position: calculateEvenPosition(1, 1),
-    connections: { left: 3, right: 5, up: 1, down: 7 },
+    connections: { left: 3, right: 5, up: 1, down: null },
     type: 'shelf',
-    records: [7, 8],
+    records: [3],
   },
   5: {
     id: 5,
     grid: { row: 1, col: 2 },
     position: calculateEvenPosition(1, 2),
-    connections: { left: 4, right: null, up: 2, down: 8 },
+    connections: { left: 4, right: null, up: 2, down: null },
     type: 'shelf',
-    records: [9, 10],
-  },
-  // Row 2 (bottom)
-  6: {
-    id: 6,
-    grid: { row: 2, col: 0 },
-    position: calculateEvenPosition(2, 0),
-    connections: { left: null, right: 7, up: 3, down: null },
-    type: 'shelf',
-    records: [11, 12],
-  },
-  7: {
-    id: 7,
-    grid: { row: 2, col: 1 },
-    position: calculateEvenPosition(2, 1),
-    connections: { left: 6, right: 8, up: 4, down: null },
-    type: 'shelf',
-    records: [13],
-  },
-  8: {
-    id: 8,
-    grid: { row: 2, col: 2 },
-    position: calculateEvenPosition(2, 2),
-    connections: { left: 7, right: null, up: 5, down: null },
-    type: 'shelf',
-    records: [14],
+    records: [4],
   },
 };
 
-export const CAT_START_PLATFORM = 4; // Start in middle
+export const CAT_START_PLATFORM = 4; // Start in middle of bottom row
 export const CAT_START_RECORD = 0;
 
 // Helper function to get platform by ID

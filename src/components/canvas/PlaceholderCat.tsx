@@ -20,14 +20,16 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
   
   if (platformData.type === 'shelf' && recordIndex !== null && recordIndex < platformData.records.length) {
     // Position cat next to the current record on the shelf
+    // Records are now 2x2 and spaced 2.2 apart
     const recordCount = platformData.records.length;
-    const recordSpacing = 1.2;
-    const startOffset = -(recordCount - 1) * recordSpacing / 2;
-    catPosition.x += startOffset + recordIndex * recordSpacing;
+    const RECORD_SPACING = 2.2;
+    const totalWidth = (recordCount - 1) * RECORD_SPACING;
+    const startOffset = -totalWidth / 2;
+    catPosition.x += startOffset + recordIndex * RECORD_SPACING;
   }
 
-  // Add slight Y offset to sit on platform
-  catPosition.y += 0.3;
+  // Position cat on the platform (platform is at y - 1.1 from record center)
+  catPosition.y = platformData.position.y - 1.1 + 0.3; // Platform y + slight offset to sit on it
 
   useFrame(() => {
     if (catRef.current) {

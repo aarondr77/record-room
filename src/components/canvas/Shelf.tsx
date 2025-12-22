@@ -13,19 +13,20 @@ interface ShelfProps {
 }
 
 export function Shelf({ platform, tracks, highlightedTrackIndex, onRecordClick }: ShelfProps) {
-  const shelfRef = useRef<Mesh>(null);
+  const RECORD_SIZE = 2; // Same size as window
+  const RECORD_SPACING = 2.2; // Space between records (slightly more than record size)
 
-  // Calculate record positions on shelf
+  // Calculate record positions on shelf - evenly spaced
   const recordPositions = useMemo(() => {
     const positions: Array<[number, number, number]> = [];
     const recordCount = platform.records.length;
-    const recordSpacing = 1.2;
-    const startOffset = -(recordCount - 1) * recordSpacing / 2;
+    const totalWidth = (recordCount - 1) * RECORD_SPACING;
+    const startOffset = -totalWidth / 2;
     
     platform.records.forEach((trackIndex, index) => {
       positions.push([
-        platform.position.x + startOffset + index * recordSpacing,
-        platform.position.y + 0.5,
+        platform.position.x + startOffset + index * RECORD_SPACING,
+        platform.position.y,
         platform.position.z,
       ]);
     });
@@ -35,19 +36,7 @@ export function Shelf({ platform, tracks, highlightedTrackIndex, onRecordClick }
 
   return (
     <group>
-      {/* Shelf board */}
-      <mesh ref={shelfRef} position={[platform.position.x, platform.position.y, platform.position.z]} castShadow receiveShadow>
-        <boxGeometry args={[platform.records.length * 1.2 + 0.5, 0.2, 0.8]} />
-        <meshStandardMaterial color="#8B4513" metalness={0.2} roughness={0.8} />
-      </mesh>
-      
-      {/* Platform underneath shelf */}
-      <Platform 
-        position={[platform.position.x, platform.position.y - 0.3, platform.position.z]} 
-        size={[platform.records.length * 1.2 + 0.8, 0.1, 1.5]} 
-      />
-      
-      {/* Records */}
+      {/* Records - each has its own platform, no shelf board */}
       {platform.records.map((trackIndex, index) => {
         const track = tracks[trackIndex];
         if (!track) return null;

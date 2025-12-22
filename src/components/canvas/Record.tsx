@@ -14,8 +14,8 @@ interface RecordProps {
 function AlbumArt({ url }: { url: string }) {
   const texture = useTexture(url);
   return (
-    <mesh position={[0, 0.3, 0.06]}>
-      <planeGeometry args={[0.5, 0.5]} />
+    <mesh position={[0, 0, 0.02]}>
+      <planeGeometry args={[1.8, 1.8]} />
       <meshStandardMaterial map={texture} />
     </mesh>
   );
@@ -24,21 +24,29 @@ function AlbumArt({ url }: { url: string }) {
 export function Record({ track, position, isHighlighted = false, onClick }: RecordProps) {
   const recordRef = useRef<Mesh>(null);
   const albumArtUrl = track.album.images[0]?.url;
+  const RECORD_SIZE = 2; // Same size as window
 
   return (
     <group position={position}>
-      {/* Platform underneath */}
-      <Platform position={[0, -0.3, 0]} size={[1.2, 0.1, 1.2]} />
+      {/* Single platform underneath - same size as record */}
+      <Platform position={[0, -1.1, 0]} size={[RECORD_SIZE, 0.1, 1.5]} />
       
-      {/* Record disc */}
+      {/* Album art - large, fills most of the 2x2 space */}
+      {albumArtUrl && (
+        <Suspense fallback={null}>
+          <AlbumArt url={albumArtUrl} />
+        </Suspense>
+      )}
+      
+      {/* Record disc border/frame - thin border around album art */}
       <mesh 
         ref={recordRef} 
-        position={[0, 0.2, 0.01]}
+        position={[0, 0, 0.01]}
         onClick={onClick}
         castShadow
         receiveShadow
       >
-        <cylinderGeometry args={[0.4, 0.4, 0.05, 32]} />
+        <ringGeometry args={[0.9, 1.0, 64]} />
         <meshStandardMaterial 
           color={isHighlighted ? "#FFD700" : "#2C2C2C"}
           metalness={0.8}
@@ -46,17 +54,10 @@ export function Record({ track, position, isHighlighted = false, onClick }: Reco
         />
       </mesh>
       
-      {/* Album art */}
-      {albumArtUrl && (
-        <Suspense fallback={null}>
-          <AlbumArt url={albumArtUrl} />
-        </Suspense>
-      )}
-      
       {/* Highlight ring */}
       {isHighlighted && (
-        <mesh position={[0, 0.2, 0.02]}>
-          <ringGeometry args={[0.45, 0.5, 32]} />
+        <mesh position={[0, 0, 0.02]}>
+          <ringGeometry args={[1.0, 1.05, 64]} />
           <meshStandardMaterial 
             color="#FFD700" 
             emissive="#FFD700"

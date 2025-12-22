@@ -10,12 +10,13 @@ interface WindowProps {
 export function Window({ position, hasPlatform = true }: WindowProps) {
   const frameRef = useRef<Mesh>(null);
   const glassRef = useRef<Mesh>(null);
+  const WINDOW_SIZE = 2;
 
   return (
     <group position={position}>
       {/* Window frame - deep brown from style guide */}
       <mesh ref={frameRef} position={[0, 0, 0.01]} castShadow>
-        <boxGeometry args={[2, 2, 0.2]} />
+        <boxGeometry args={[WINDOW_SIZE, WINDOW_SIZE, 0.2]} />
         <meshStandardMaterial color="#5C4A37" metalness={0.2} roughness={0.8} />
       </mesh>
       
@@ -37,9 +38,9 @@ export function Window({ position, hasPlatform = true }: WindowProps) {
         <meshStandardMaterial color="#87CEEB" />
       </mesh>
 
-      {/* Platform underneath */}
+      {/* Single platform underneath - same size as window */}
       {hasPlatform && (
-        <Platform position={[0, -1.2, 0]} size={[2.2, 0.1, 1.5]} />
+        <Platform position={[0, -1.1, 0]} size={[WINDOW_SIZE, 0.1, 1.5]} />
       )}
     </group>
   );
