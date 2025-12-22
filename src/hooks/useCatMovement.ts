@@ -8,21 +8,25 @@ export function useCatMovement() {
   const [facing, setFacing] = useState<'left' | 'right'>('right');
   const [isMoving, setIsMoving] = useState(false);
 
+  const MOVE_DURATION_MS = 400;
+
+  const startMove = useCallback(() => {
+    setIsMoving(true);
+    setTimeout(() => setIsMoving(false), MOVE_DURATION_MS);
+  }, []);
+
   const jumpToPlatform = useCallback((targetPlatformId: number | null) => {
     if (targetPlatformId === null || isMoving) return;
     
     const targetPlatform = getPlatform(targetPlatformId);
     if (!targetPlatform) return;
 
-    setIsMoving(true);
+    startMove();
     setPlatform(targetPlatformId);
     
     // Land on first record (or null for window)
     setRecordIndex(targetPlatform.type === 'window' ? null : 0);
-    
-    // Animation duration
-    setTimeout(() => setIsMoving(false), 400);
-  }, [isMoving]);
+  }, [isMoving, startMove]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (isMoving) return;
@@ -40,6 +44,7 @@ export function useCatMovement() {
           jumpToPlatform(currentPlatform.connections.right);
         } else if (recordIndex !== null && recordIndex > 0) {
           // Move to previous record on same shelf
+          startMove();
           setRecordIndex(recordIndex - 1);
         } else if (currentPlatform.connections.left !== null) {
           // Jump to left platform
@@ -53,6 +58,7 @@ export function useCatMovement() {
           jumpToPlatform(currentPlatform.connections.right);
         } else if (recordIndex !== null && recordIndex < records.length - 1) {
           // Move to next record on same shelf
+          startMove();
           setRecordIndex(recordIndex + 1);
         } else if (currentPlatform.connections.right !== null) {
           // Jump to right platform
@@ -76,7 +82,7 @@ export function useCatMovement() {
         }
         break;
     }
-  }, [platform, recordIndex, isMoving, jumpToPlatform]);
+  }, [platform, recordIndex, isMoving, jumpToPlatform, startMove]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);

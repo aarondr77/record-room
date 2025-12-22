@@ -1,5 +1,5 @@
-import { useRef, useMemo } from 'react';
-import { Group, Vector3, Mesh, MeshStandardMaterial, Color, SphereGeometry, CylinderGeometry, ConeGeometry, CatmullRomCurve3, TubeGeometry } from 'three';
+import { useEffect, useMemo, useRef } from 'react';
+import { CatmullRomCurve3, Color, ConeGeometry, CylinderGeometry, Euler, Group, Mesh, MeshStandardMaterial, SphereGeometry, TubeGeometry, Vector3 } from 'three';
 import { useFrame } from '@react-three/fiber';
 import { getPlatform } from '../../config/platforms';
 import type { CatState } from '../../types';
@@ -11,6 +11,36 @@ interface PlaceholderCatProps {
 // Cat scale - sized to fit on shelf platforms (records are 2x2 units)
 // Cat should be clearly visible - about 0.6-0.8 units tall when sitting
 const CAT_SCALE = 1.0;
+const JUMP_DURATION_S = 0.4; // matches MOVE_DURATION_MS in useCatMovement
+const JUMP_MIN_HEIGHT = 0.18;
+const JUMP_MAX_HEIGHT = 0.42;
+
+function clamp01(v: number) {
+  return Math.max(0, Math.min(1, v));
+}
+
+function easeInOutCubic(t: number) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function parabola01(t: number) {
+  // 0..1..0, peak at t=0.5
+  return 4 * t * (1 - t);
+}
+
+type TransformSnapshot = {
+  pos: Vector3;
+  rot: Euler;
+  scale: Vector3;
+};
+
+function snapTransform(m: Mesh): TransformSnapshot {
+  return {
+    pos: m.position.clone(),
+    rot: m.rotation.clone(),
+    scale: m.scale.clone(),
+  };
+}
 
 // Material definitions for tuxedo cat appearance
 function createBlackFurMaterial() {
@@ -64,9 +94,20 @@ function createInnerEarMaterial() {
 }
 
 // Create a sitting tuxedo cat model facing forward (+Z direction, toward camera)
-function createCatModel(): { group: Group; tail: Mesh | null } {
+function createCatModel(): {
+  group: Group;
+  tail: Mesh | null;
+  frontLegs: { left: Mesh; right: Mesh } | null;
+  haunches: { left: Mesh; right: Mesh } | null;
+  body: Mesh | null;
+} {
   const catGroup = new Group();
   let tailMesh: Mesh | null = null;
+  let bodyMesh: Mesh | null = null;
+  let frontLegLeft: Mesh | null = null;
+  let frontLegRight: Mesh | null = null;
+  let haunchLeft: Mesh | null = null;
+  let haunchRight: Mesh | null = null;
   
   // === BODY (sitting cat - oval shaped, slightly tilted back) - BLACK ===
   const bodyGeometry = new SphereGeometry(0.18, 24, 16);
@@ -76,6 +117,7 @@ function createCatModel(): { group: Group; tail: Mesh | null } {
   body.rotation.x = -0.15; // Slight tilt back for sitting pose
   body.castShadow = true;
   body.receiveShadow = true;
+  bodyMesh = body;
   catGroup.add(body);
   
   // === CHEST/FRONT - WHITE (tuxedo marking) ===
@@ -208,12 +250,14 @@ function createCatModel(): { group: Group; tail: Mesh | null } {
   frontLeftLeg.position.set(-0.08, -0.02, 0.1);
   frontLeftLeg.castShadow = true;
   frontLeftLeg.receiveShadow = true;
+  frontLegLeft = frontLeftLeg;
   catGroup.add(frontLeftLeg);
   
   const frontRightLeg = new Mesh(frontLegGeometry, createBlackFurMaterial());
   frontRightLeg.position.set(0.08, -0.02, 0.1);
   frontRightLeg.castShadow = true;
   frontRightLeg.receiveShadow = true;
+  frontLegRight = frontRightLeg;
   catGroup.add(frontRightLeg);
   
   // === FRONT PAWS - WHITE (tuxedo "socks") ===
@@ -238,12 +282,14 @@ function createCatModel(): { group: Group; tail: Mesh | null } {
   leftHaunch.position.set(-0.1, 0.02, -0.05);
   leftHaunch.castShadow = true;
   leftHaunch.receiveShadow = true;
+  haunchLeft = leftHaunch;
   catGroup.add(leftHaunch);
   
   const rightHaunch = new Mesh(haunchGeometry, createBlackFurMaterial());
   rightHaunch.position.set(0.1, 0.02, -0.05);
   rightHaunch.castShadow = true;
   rightHaunch.receiveShadow = true;
+  haunchRight = rightHaunch;
   catGroup.add(rightHaunch);
   
   // === BACK PAWS (tucked under) - WHITE (tuxedo "socks") ===
@@ -287,21 +333,75 @@ function createCatModel(): { group: Group; tail: Mesh | null } {
   tailWhiteTip.position.set(0.11, 0.4, -0.17);
   catGroup.add(tailWhiteTip);
   
-  return { group: catGroup, tail: tailMesh };
+  return {
+    group: catGroup,
+    tail: tailMesh,
+    body: bodyMesh,
+    frontLegs: frontLegLeft && frontLegRight ? { left: frontLegLeft, right: frontLegRight } : null,
+    haunches: haunchLeft && haunchRight ? { left: haunchLeft, right: haunchRight } : null,
+  };
 }
 
 export function PlaceholderCat({ catState }: PlaceholderCatProps) {
   const catRef = useRef<Group>(null);
   const tailRef = useRef<Mesh | null>(null);
   const { platform, recordIndex, facing, isMoving } = catState;
+  const partsRef = useRef<{
+    body: Mesh | null;
+    frontLegs: { left: Mesh; right: Mesh } | null;
+    haunches: { left: Mesh; right: Mesh } | null;
+    base?: {
+      body?: TransformSnapshot;
+      frontLegLeft?: TransformSnapshot;
+      frontLegRight?: TransformSnapshot;
+      haunchLeft?: TransformSnapshot;
+      haunchRight?: TransformSnapshot;
+      tail?: TransformSnapshot;
+    };
+  }>({ body: null, frontLegs: null, haunches: null });
+
+  const jumpRef = useRef<{
+    active: boolean;
+    t0: number; // seconds from R3F clock
+    start: Vector3;
+    end: Vector3;
+    height: number;
+    lastTarget: Vector3 | null;
+  }>({
+    active: false,
+    t0: 0,
+    start: new Vector3(),
+    end: new Vector3(),
+    height: JUMP_MIN_HEIGHT,
+    lastTarget: null,
+  });
+
+  const tmpPos = useMemo(() => new Vector3(), []);
 
   // Create the procedural cat model
   const catModel = useMemo(() => {
-    const { group, tail } = createCatModel();
+    const { group, tail, body, frontLegs, haunches } = createCatModel();
     tailRef.current = tail;
+    partsRef.current.body = body;
+    partsRef.current.frontLegs = frontLegs;
+    partsRef.current.haunches = haunches;
     
     // Apply scale
     group.scale.set(CAT_SCALE, CAT_SCALE, CAT_SCALE);
+
+    // Capture base transforms for animation blending
+    const base: NonNullable<(typeof partsRef.current)['base']> = {};
+    if (partsRef.current.body) base.body = snapTransform(partsRef.current.body);
+    if (partsRef.current.frontLegs) {
+      base.frontLegLeft = snapTransform(partsRef.current.frontLegs.left);
+      base.frontLegRight = snapTransform(partsRef.current.frontLegs.right);
+    }
+    if (partsRef.current.haunches) {
+      base.haunchLeft = snapTransform(partsRef.current.haunches.left);
+      base.haunchRight = snapTransform(partsRef.current.haunches.right);
+    }
+    if (tailRef.current) base.tail = snapTransform(tailRef.current);
+    partsRef.current.base = base;
     
     return group;
   }, []);
@@ -328,40 +428,128 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
   // Move cat forward (positive Z) so it's in front of the record, not behind
   catPosition.z = platformData.position.z + 0.6;
 
+  // Initialize position on mount - set to current target
+  const isInitializedRef = useRef(false);
+  useEffect(() => {
+    if (catRef.current && !isInitializedRef.current) {
+      const initialPos = new Vector3(catPosition.x, catPosition.y, catPosition.z);
+      catRef.current.position.copy(initialPos);
+      jumpRef.current.lastTarget = initialPos.clone();
+      isInitializedRef.current = true;
+    }
+  }, [catPosition.x, catPosition.y, catPosition.z]);
+
+  // Start a jump whenever the target position changes (platform jump OR record move).
+  useEffect(() => {
+    if (!isInitializedRef.current) return; // Wait for initialization
+    
+    const target = new Vector3(catPosition.x, catPosition.y, catPosition.z);
+    const jump = jumpRef.current;
+    const last = jump.lastTarget;
+    
+    if (!last) {
+      jump.lastTarget = target.clone();
+      return;
+    }
+    
+    if (last.distanceTo(target) < 0.0001) return;
+
+    // CRITICAL: Use the ACTUAL current position, not the last target
+    // This ensures we jump from where the cat actually is, not where it should be
+    const currentPos = catRef.current?.position?.clone();
+    if (!currentPos) return;
+    
+    jump.active = true;
+    // t0 set in useFrame to the current clock time (more reliable than Date/perf).
+    jump.t0 = -1;
+    jump.start.copy(currentPos);
+    jump.end.copy(target);
+    jump.lastTarget = target.clone();
+
+    const dist = currentPos.distanceTo(target);
+    // Height scales with distance, clamped so short hops still read.
+    jump.height = Math.max(JUMP_MIN_HEIGHT, Math.min(JUMP_MAX_HEIGHT, 0.12 + dist * 0.35));
+  }, [platform, recordIndex, catPosition.x, catPosition.y, catPosition.z]);
+
   // Animation and movement
   useFrame((state) => {
     if (catRef.current) {
-      // Smoothly move to target position
-      const targetPos = new Vector3(catPosition.x, catPosition.y, catPosition.z);
-      catRef.current.position.lerp(targetPos, 0.1);
-      
-      // Face the correct direction (rotate 180 degrees so cat faces forward by default)
-      // When facing "right", cat faces right (+X)
-      // When facing "left", cat faces left (-X)
-      const baseRotation = 0; // Already facing forward (+Z)
-      catRef.current.rotation.y = facing === 'left' ? baseRotation + Math.PI / 2 : baseRotation - Math.PI / 2;
-      
-      // Animate tail (gentle sway)
-      if (tailRef.current) {
-        if (isMoving) {
-          // More active movement when moving
-          tailRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 5) * 0.4;
-          tailRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 3) * 0.15;
-        } else {
-          // Subtle idle sway
-          tailRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 1.2) * 0.15;
-          tailRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.8) * 0.05;
-        }
+      const jump = jumpRef.current;
+      const targetPos = tmpPos.set(catPosition.x, catPosition.y, catPosition.z);
+
+      // Face the correct direction
+      const baseYaw = 0; // cat model faces +Z by default
+      catRef.current.rotation.y = facing === 'left' ? baseYaw + Math.PI / 2 : baseYaw - Math.PI / 2;
+
+      // If a jump was queued, stamp start time on the first frame.
+      if (jump.active && jump.t0 < 0) {
+        jump.t0 = state.clock.elapsedTime;
       }
-      
-      // Subtle breathing animation on the body
-      const breathScale = 1 + Math.sin(state.clock.elapsedTime * 2) * 0.01;
-      catModel.scale.set(CAT_SCALE * breathScale, CAT_SCALE, CAT_SCALE * breathScale);
+
+      if (jump.active && jump.t0 >= 0) {
+        const t = clamp01((state.clock.elapsedTime - jump.t0) / JUMP_DURATION_S);
+        const eased = easeInOutCubic(t);
+
+        // World-space arc path
+        tmpPos.lerpVectors(jump.start, jump.end, eased);
+        tmpPos.y += jump.height * parabola01(t);
+        catRef.current.position.copy(tmpPos);
+
+        // Tail whips more during jump
+        const parts = partsRef.current;
+        const base = parts.base;
+        const pose = Math.sin(Math.PI * t); // For tail animation only
+        if (tailRef.current && base?.tail) {
+          tailRef.current.position.copy(base.tail.pos);
+          tailRef.current.rotation.copy(base.tail.rot);
+          tailRef.current.rotation.y += Math.sin(state.clock.elapsedTime * 9) * 0.55 * pose;
+          tailRef.current.rotation.x += Math.sin(state.clock.elapsedTime * 7) * 0.2 * pose;
+        }
+
+        // Land / cleanup
+        if (t >= 1) {
+          jump.active = false;
+          
+          // Restore tail to base position
+          if (tailRef.current && base?.tail) {
+            tailRef.current.position.copy(base.tail.pos);
+            tailRef.current.rotation.copy(base.tail.rot);
+          }
+        }
+      } else {
+        // Not jumping: only lerp if we're close to target (to avoid interfering with jump start)
+        const distToTarget = catRef.current.position.distanceTo(targetPos);
+        if (distToTarget > 0.01) {
+          // Only lerp if we're not already very close (prevents fighting with jump animation)
+          catRef.current.position.lerp(targetPos, 0.18);
+        }
+        // No rotation reset needed when idle
+
+        // Idle tail sway + breathing
+        if (tailRef.current && partsRef.current.base?.tail) {
+          const baseTail = partsRef.current.base.tail;
+          tailRef.current.position.copy(baseTail.pos);
+          tailRef.current.rotation.copy(baseTail.rot);
+
+          const amp = isMoving ? 0.35 : 0.15;
+          const spd = isMoving ? 4.5 : 1.2;
+          tailRef.current.rotation.y += Math.sin(state.clock.elapsedTime * spd) * amp;
+          tailRef.current.rotation.x += Math.sin(state.clock.elapsedTime * (spd * 0.7)) * (amp * 0.35);
+        }
+
+        const breathScale = 1 + Math.sin(state.clock.elapsedTime * 2) * 0.01;
+        catModel.scale.set(CAT_SCALE * breathScale, CAT_SCALE, CAT_SCALE * breathScale);
+      }
     }
   });
 
+  // Initialize position - don't set it in JSX to avoid conflicts with animation
+  const initialPosition = useMemo(() => {
+    return [catPosition.x, catPosition.y, catPosition.z] as [number, number, number];
+  }, []); // Only set once on mount
+
   return (
-    <group ref={catRef} position={[catPosition.x, catPosition.y, catPosition.z]}>
+    <group ref={catRef} position={initialPosition}>
       <primitive 
         object={catModel} 
         castShadow 
