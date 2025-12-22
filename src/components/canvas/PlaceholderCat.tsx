@@ -42,56 +42,44 @@ function snapTransform(m: Mesh): TransformSnapshot {
   };
 }
 
-// Material definitions for tuxedo cat appearance
-function createBlackFurMaterial() {
-  return new MeshStandardMaterial({
-    color: new Color('#1A1A1A'), // Deep black fur
-    roughness: 0.85,
-    metalness: 0.0,
-  });
-}
+// Material definitions for tuxedo cat appearance - created once and reused
+const blackFurMaterial = new MeshStandardMaterial({
+  color: new Color('#1A1A1A'), // Deep black fur
+  roughness: 0.85,
+  metalness: 0.0,
+});
 
-function createWhiteFurMaterial() {
-  return new MeshStandardMaterial({
-    color: new Color('#F5F5F5'), // Bright white fur
-    roughness: 0.9,
-    metalness: 0.0,
-  });
-}
+const whiteFurMaterial = new MeshStandardMaterial({
+  color: new Color('#F5F5F5'), // Bright white fur
+  roughness: 0.9,
+  metalness: 0.0,
+});
 
-function createEyeMaterial() {
-  return new MeshStandardMaterial({
-    color: new Color('#4A9F4A'), // Bright green cat eyes
-    emissive: new Color('#2D6B2D'),
-    emissiveIntensity: 0.5,
-    roughness: 0.1,
-    metalness: 0.2,
-  });
-}
+const eyeMaterial = new MeshStandardMaterial({
+  color: new Color('#4A9F4A'), // Bright green cat eyes
+  emissive: new Color('#2D6B2D'),
+  emissiveIntensity: 0.5,
+  roughness: 0.1,
+  metalness: 0.2,
+});
 
-function createPupilMaterial() {
-  return new MeshStandardMaterial({
-    color: new Color('#050505'), // Black pupils
-    roughness: 0.1,
-    metalness: 0.0,
-  });
-}
+const pupilMaterial = new MeshStandardMaterial({
+  color: new Color('#050505'), // Black pupils
+  roughness: 0.1,
+  metalness: 0.0,
+});
 
-function createNoseMaterial() {
-  return new MeshStandardMaterial({
-    color: new Color('#2A2A2A'), // Dark nose (tuxedo cats often have dark noses)
-    roughness: 0.5,
-    metalness: 0.0,
-  });
-}
+const noseMaterial = new MeshStandardMaterial({
+  color: new Color('#2A2A2A'), // Dark nose (tuxedo cats often have dark noses)
+  roughness: 0.5,
+  metalness: 0.0,
+});
 
-function createInnerEarMaterial() {
-  return new MeshStandardMaterial({
-    color: new Color('#E8B4B8'), // Pink inner ear
-    roughness: 0.8,
-    metalness: 0.0,
-  });
-}
+const innerEarMaterial = new MeshStandardMaterial({
+  color: new Color('#E8B4B8'), // Pink inner ear
+  roughness: 0.8,
+  metalness: 0.0,
+});
 
 // Create a sitting tuxedo cat model facing forward (+Z direction, toward camera)
 function createCatModel(): {
@@ -102,9 +90,9 @@ function createCatModel(): {
   let tailMesh: Mesh | null = null;
   
   // === BODY (sitting cat - oval shaped, slightly tilted back) - BLACK ===
-  const bodyGeometry = new SphereGeometry(0.18, 24, 16);
+  const bodyGeometry = new SphereGeometry(0.18, 10, 8); // Minimal segments
   bodyGeometry.scale(1.0, 1.3, 0.85); // Taller than wide for sitting pose
-  const body = new Mesh(bodyGeometry, createBlackFurMaterial());
+  const body = new Mesh(bodyGeometry, blackFurMaterial);
   body.position.set(0, 0.15, 0);
   body.rotation.x = -0.15; // Slight tilt back for sitting pose
   body.castShadow = true;
@@ -112,50 +100,50 @@ function createCatModel(): {
   catGroup.add(body);
   
   // === CHEST/FRONT - WHITE (tuxedo marking) ===
-  const chestGeometry = new SphereGeometry(0.13, 16, 12);
+  const chestGeometry = new SphereGeometry(0.13, 8, 6); // Minimal segments
   chestGeometry.scale(0.85, 1.1, 0.65);
-  const chest = new Mesh(chestGeometry, createWhiteFurMaterial());
+  const chest = new Mesh(chestGeometry, whiteFurMaterial);
   chest.position.set(0, 0.1, 0.09);
   chest.castShadow = true;
   catGroup.add(chest);
   
   // === BELLY - WHITE (extends down from chest) ===
-  const bellyGeometry = new SphereGeometry(0.1, 16, 12);
+  const bellyGeometry = new SphereGeometry(0.1, 8, 6); // Minimal segments
   bellyGeometry.scale(0.9, 1.0, 0.6);
-  const belly = new Mesh(bellyGeometry, createWhiteFurMaterial());
+  const belly = new Mesh(bellyGeometry, whiteFurMaterial);
   belly.position.set(0, -0.02, 0.06);
   belly.castShadow = true;
   catGroup.add(belly);
   
   // === HEAD - BLACK ===
-  const headGeometry = new SphereGeometry(0.14, 24, 20);
+  const headGeometry = new SphereGeometry(0.14, 10, 8); // Minimal segments
   headGeometry.scale(1.1, 1.0, 0.95); // Slightly wider for cat face
-  const head = new Mesh(headGeometry, createBlackFurMaterial());
+  const head = new Mesh(headGeometry, blackFurMaterial);
   head.position.set(0, 0.42, 0.08);
   head.castShadow = true;
   head.receiveShadow = true;
   catGroup.add(head);
   
   // === MUZZLE (snout area) - WHITE (tuxedo marking) ===
-  const muzzleGeometry = new SphereGeometry(0.065, 16, 12);
+  const muzzleGeometry = new SphereGeometry(0.065, 8, 6); // Minimal segments
   muzzleGeometry.scale(1.3, 0.85, 1.0);
-  const muzzle = new Mesh(muzzleGeometry, createWhiteFurMaterial());
+  const muzzle = new Mesh(muzzleGeometry, whiteFurMaterial);
   muzzle.position.set(0, 0.37, 0.17);
   muzzle.castShadow = true;
   catGroup.add(muzzle);
   
   // === CHIN - WHITE (connects to chest) ===
-  const chinGeometry = new SphereGeometry(0.04, 12, 10);
+  const chinGeometry = new SphereGeometry(0.04, 6, 6); // Minimal segments
   chinGeometry.scale(1.2, 1.0, 0.8);
-  const chin = new Mesh(chinGeometry, createWhiteFurMaterial());
+  const chin = new Mesh(chinGeometry, whiteFurMaterial);
   chin.position.set(0, 0.32, 0.14);
   catGroup.add(chin);
   
   // === EARS (triangular, pointing up) - BLACK ===
-  const earGeometry = new ConeGeometry(0.05, 0.1, 4);
+  const earGeometry = new ConeGeometry(0.05, 0.1, 3); // Minimal segments (3 is minimum)
   
   // Left ear
-  const leftEar = new Mesh(earGeometry, createBlackFurMaterial());
+  const leftEar = new Mesh(earGeometry, blackFurMaterial);
   leftEar.position.set(-0.08, 0.54, 0.04);
   leftEar.rotation.z = -0.25;
   leftEar.rotation.x = 0.1;
@@ -163,15 +151,15 @@ function createCatModel(): {
   catGroup.add(leftEar);
   
   // Left inner ear
-  const innerEarGeometry = new ConeGeometry(0.03, 0.06, 4);
-  const leftInnerEar = new Mesh(innerEarGeometry, createInnerEarMaterial());
+  const innerEarGeometry = new ConeGeometry(0.03, 0.06, 3); // Minimal segments
+  const leftInnerEar = new Mesh(innerEarGeometry, innerEarMaterial);
   leftInnerEar.position.set(-0.08, 0.53, 0.06);
   leftInnerEar.rotation.z = -0.25;
   leftInnerEar.rotation.x = 0.1;
   catGroup.add(leftInnerEar);
   
   // Right ear
-  const rightEar = new Mesh(earGeometry, createBlackFurMaterial());
+  const rightEar = new Mesh(earGeometry, blackFurMaterial);
   rightEar.position.set(0.08, 0.54, 0.04);
   rightEar.rotation.z = 0.25;
   rightEar.rotation.x = 0.1;
@@ -179,116 +167,105 @@ function createCatModel(): {
   catGroup.add(rightEar);
   
   // Right inner ear
-  const rightInnerEar = new Mesh(innerEarGeometry, createInnerEarMaterial());
+  const rightInnerEar = new Mesh(innerEarGeometry, innerEarMaterial);
   rightInnerEar.position.set(0.08, 0.53, 0.06);
   rightInnerEar.rotation.z = 0.25;
   rightInnerEar.rotation.x = 0.1;
   catGroup.add(rightInnerEar);
   
   // === EYES (almond-shaped with pupils) ===
-  const eyeWhiteGeometry = new SphereGeometry(0.028, 16, 12);
+  const eyeWhiteGeometry = new SphereGeometry(0.028, 8, 6); // Minimal segments
   eyeWhiteGeometry.scale(1.3, 1.0, 0.5);
   
   // Left eye
-  const leftEyeWhite = new Mesh(eyeWhiteGeometry, createEyeMaterial());
+  const leftEyeWhite = new Mesh(eyeWhiteGeometry, eyeMaterial);
   leftEyeWhite.position.set(-0.05, 0.44, 0.16);
   leftEyeWhite.rotation.y = -0.2;
   catGroup.add(leftEyeWhite);
   
   // Left pupil (vertical slit)
-  const pupilGeometry = new SphereGeometry(0.015, 8, 8);
+  const pupilGeometry = new SphereGeometry(0.015, 4, 4); // Minimal segments
   pupilGeometry.scale(0.5, 1.2, 0.5);
-  const leftPupil = new Mesh(pupilGeometry, createPupilMaterial());
+  const leftPupil = new Mesh(pupilGeometry, pupilMaterial);
   leftPupil.position.set(-0.05, 0.44, 0.175);
   catGroup.add(leftPupil);
   
   // Right eye
-  const rightEyeWhite = new Mesh(eyeWhiteGeometry, createEyeMaterial());
+  const rightEyeWhite = new Mesh(eyeWhiteGeometry, eyeMaterial);
   rightEyeWhite.position.set(0.05, 0.44, 0.16);
   rightEyeWhite.rotation.y = 0.2;
   catGroup.add(rightEyeWhite);
   
   // Right pupil
-  const rightPupil = new Mesh(pupilGeometry, createPupilMaterial());
+  const rightPupil = new Mesh(pupilGeometry, pupilMaterial);
   rightPupil.position.set(0.05, 0.44, 0.175);
   catGroup.add(rightPupil);
   
   // === NOSE (small triangle) - DARK ===
-  const noseGeometry = new SphereGeometry(0.02, 8, 8);
+  const noseGeometry = new SphereGeometry(0.02, 4, 4); // Minimal segments
   noseGeometry.scale(1.2, 0.8, 0.8);
-  const nose = new Mesh(noseGeometry, createNoseMaterial());
+  const nose = new Mesh(noseGeometry, noseMaterial);
   nose.position.set(0, 0.39, 0.2);
   catGroup.add(nose);
   
   // === WHISKER MARKS (small bumps on muzzle) - WHITE ===
-  const whiskerBumpGeometry = new SphereGeometry(0.008, 6, 6);
-  const whiskerPositions = [
-    [-0.04, 0.36, 0.19],
-    [-0.05, 0.35, 0.17],
-    [0.04, 0.36, 0.19],
-    [0.05, 0.35, 0.17],
-  ];
-  whiskerPositions.forEach(([x, y, z]) => {
-    const bump = new Mesh(whiskerBumpGeometry, createWhiteFurMaterial());
-    bump.position.set(x, y, z);
-    catGroup.add(bump);
-  });
+  // Removed whisker bumps for performance - they're very small and hard to see
   
   // === FRONT LEGS (sitting, vertical) - BLACK ===
-  const frontLegGeometry = new CylinderGeometry(0.035, 0.04, 0.18, 12);
+  const frontLegGeometry = new CylinderGeometry(0.035, 0.04, 0.18, 6); // Minimal segments
   
-  const frontLeftLeg = new Mesh(frontLegGeometry, createBlackFurMaterial());
+  const frontLeftLeg = new Mesh(frontLegGeometry, blackFurMaterial);
   frontLeftLeg.position.set(-0.08, -0.02, 0.1);
   frontLeftLeg.castShadow = true;
   frontLeftLeg.receiveShadow = true;
   catGroup.add(frontLeftLeg);
   
-  const frontRightLeg = new Mesh(frontLegGeometry, createBlackFurMaterial());
+  const frontRightLeg = new Mesh(frontLegGeometry, blackFurMaterial);
   frontRightLeg.position.set(0.08, -0.02, 0.1);
   frontRightLeg.castShadow = true;
   frontRightLeg.receiveShadow = true;
   catGroup.add(frontRightLeg);
   
   // === FRONT PAWS - WHITE (tuxedo "socks") ===
-  const pawGeometry = new SphereGeometry(0.04, 12, 8);
+  const pawGeometry = new SphereGeometry(0.04, 6, 4); // Minimal segments
   pawGeometry.scale(1.0, 0.5, 1.2);
   
-  const frontLeftPaw = new Mesh(pawGeometry, createWhiteFurMaterial());
+  const frontLeftPaw = new Mesh(pawGeometry, whiteFurMaterial);
   frontLeftPaw.position.set(-0.08, -0.12, 0.12);
   frontLeftPaw.castShadow = true;
   catGroup.add(frontLeftPaw);
   
-  const frontRightPaw = new Mesh(pawGeometry, createWhiteFurMaterial());
+  const frontRightPaw = new Mesh(pawGeometry, whiteFurMaterial);
   frontRightPaw.position.set(0.08, -0.12, 0.12);
   frontRightPaw.castShadow = true;
   catGroup.add(frontRightPaw);
   
   // === BACK LEGS (haunches - sitting pose) - BLACK ===
-  const haunchGeometry = new SphereGeometry(0.08, 16, 12);
+  const haunchGeometry = new SphereGeometry(0.08, 8, 6); // Minimal segments
   haunchGeometry.scale(0.9, 1.1, 1.0);
   
-  const leftHaunch = new Mesh(haunchGeometry, createBlackFurMaterial());
+  const leftHaunch = new Mesh(haunchGeometry, blackFurMaterial);
   leftHaunch.position.set(-0.1, 0.02, -0.05);
   leftHaunch.castShadow = true;
   leftHaunch.receiveShadow = true;
   catGroup.add(leftHaunch);
   
-  const rightHaunch = new Mesh(haunchGeometry, createBlackFurMaterial());
+  const rightHaunch = new Mesh(haunchGeometry, blackFurMaterial);
   rightHaunch.position.set(0.1, 0.02, -0.05);
   rightHaunch.castShadow = true;
   rightHaunch.receiveShadow = true;
   catGroup.add(rightHaunch);
   
   // === BACK PAWS (tucked under) - WHITE (tuxedo "socks") ===
-  const backPawGeometry = new SphereGeometry(0.035, 12, 8);
+  const backPawGeometry = new SphereGeometry(0.035, 6, 4); // Minimal segments
   backPawGeometry.scale(1.0, 0.5, 1.1);
   
-  const backLeftPaw = new Mesh(backPawGeometry, createWhiteFurMaterial());
+  const backLeftPaw = new Mesh(backPawGeometry, whiteFurMaterial);
   backLeftPaw.position.set(-0.12, -0.1, 0.0);
   backLeftPaw.castShadow = true;
   catGroup.add(backLeftPaw);
   
-  const backRightPaw = new Mesh(backPawGeometry, createWhiteFurMaterial());
+  const backRightPaw = new Mesh(backPawGeometry, whiteFurMaterial);
   backRightPaw.position.set(0.12, -0.1, 0.0);
   backRightPaw.castShadow = true;
   catGroup.add(backRightPaw);
@@ -301,22 +278,22 @@ function createCatModel(): {
     new Vector3(0.15, 0.32, -0.22),
     new Vector3(0.12, 0.38, -0.18),
   ]);
-  const tailGeometry = new TubeGeometry(tailCurve, 20, 0.025, 8, false);
-  const tail = new Mesh(tailGeometry, createBlackFurMaterial());
+  const tailGeometry = new TubeGeometry(tailCurve, 8, 0.025, 4, false); // Minimal segments
+  const tail = new Mesh(tailGeometry, blackFurMaterial);
   tail.castShadow = true;
   tailMesh = tail;
   catGroup.add(tail);
   
   // Tail tip (slightly fluffy end) - BLACK with small white tip
-  const tailTipGeometry = new SphereGeometry(0.03, 8, 8);
-  const tailTip = new Mesh(tailTipGeometry, createBlackFurMaterial());
+  const tailTipGeometry = new SphereGeometry(0.03, 4, 4); // Minimal segments
+  const tailTip = new Mesh(tailTipGeometry, blackFurMaterial);
   tailTip.position.set(0.12, 0.38, -0.18);
   tailTip.castShadow = true;
   catGroup.add(tailTip);
   
   // Small white tip at very end of tail
-  const tailWhiteTipGeometry = new SphereGeometry(0.015, 6, 6);
-  const tailWhiteTip = new Mesh(tailWhiteTipGeometry, createWhiteFurMaterial());
+  const tailWhiteTipGeometry = new SphereGeometry(0.015, 4, 4); // Reduced segments
+  const tailWhiteTip = new Mesh(tailWhiteTipGeometry, whiteFurMaterial);
   tailWhiteTip.position.set(0.11, 0.4, -0.17);
   catGroup.add(tailWhiteTip);
   
