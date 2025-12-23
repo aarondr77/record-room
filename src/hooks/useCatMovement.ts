@@ -37,6 +37,7 @@ export function useCatMovement(options: UseCatMovementOptions = {}) {
   const [isMoving, setIsMoving] = useState(false);
   const [floorX, setFloorX] = useState(startFloorX); // X position when on floor
   const [carryingToy, setCarryingToy] = useState(false);
+  const [startPullup, setStartPullup] = useState(false); // Trigger for window pullup animation
   
   // Track which keys are currently pressed for continuous floor movement
   const keysPressed = useRef<Set<string>>(new Set());
@@ -194,50 +195,29 @@ export function useCatMovement(options: UseCatMovementOptions = {}) {
     // Regular platform controls
     if (isMoving) return;
 
-    const records = currentPlatform.records;
-
     switch (e.key) {
       case 'ArrowLeft':
         setFacing('left');
-        if (currentPlatform.type === 'window') {
-          // At window, any arrow exits - go right
-          jumpToPlatform(currentPlatform.connections.right);
-        } else if (recordIndex !== null && recordIndex > 0) {
-          // Move to previous record on same shelf
-          startMove();
-          setRecordIndex(recordIndex - 1);
-        } else if (currentPlatform.connections.left !== null) {
-          // Jump to left platform
+        if (currentPlatform.connections.left !== null) {
           jumpToPlatform(currentPlatform.connections.left);
         }
         break;
 
       case 'ArrowRight':
         setFacing('right');
-        if (currentPlatform.type === 'window') {
-          jumpToPlatform(currentPlatform.connections.right);
-        } else if (recordIndex !== null && recordIndex < records.length - 1) {
-          // Move to next record on same shelf
-          startMove();
-          setRecordIndex(recordIndex + 1);
-        } else if (currentPlatform.connections.right !== null) {
-          // Jump to right platform
+        if (currentPlatform.connections.right !== null) {
           jumpToPlatform(currentPlatform.connections.right);
         }
         break;
 
       case 'ArrowUp':
-        if (currentPlatform.type === 'window') {
-          jumpToPlatform(currentPlatform.connections.right);
-        } else if (currentPlatform.connections.up !== null) {
+        if (currentPlatform.connections.up !== null) {
           jumpToPlatform(currentPlatform.connections.up);
         }
         break;
 
       case 'ArrowDown':
-        if (currentPlatform.type === 'window') {
-          jumpToPlatform(currentPlatform.connections.right);
-        } else if (currentPlatform.connections.down !== null) {
+        if (currentPlatform.connections.down !== null) {
           // For bottom row shelves, this goes to floor
           // Pass current X position so cat lands at same X
           const targetId = currentPlatform.connections.down;
@@ -254,6 +234,18 @@ export function useCatMovement(options: UseCatMovementOptions = {}) {
       case 'D':
         // Drop toy (works on any platform)
         dropToy();
+        break;
+
+      case 'Enter':
+      case ' ':
+        // Space/Enter: trigger pullup if on window
+        if (currentPlatform.type === 'window') {
+          e.preventDefault();
+          setStartPullup(true);
+          // Reset after a short delay to allow the animation to start
+          setTimeout(() => setStartPullup(false), 100);
+        }
+        // Note: Floor interactions and record interactions are handled elsewhere
         break;
     }
   }, [platform, recordIndex, isMoving, jumpToPlatform, startMove, floorX, dropToy, pickupToy]);
@@ -289,11 +281,13 @@ export function useCatMovement(options: UseCatMovementOptions = {}) {
     carryingToy,
     currentTrackIndex,
     isNearToy: isNearToy(),
+    startPullup, // Add pullup trigger to state
     pickupToy,
     dropToy,
   } as CatState & { 
     currentTrackIndex: number | null;
     isNearToy: boolean;
+    startPullup: boolean;
     pickupToy: () => void;
     dropToy: () => void;
   };

@@ -170,6 +170,10 @@ export function RoomPage({ tracks, currentUser, accessToken }: RoomPageProps) {
   
   // Show exit prompt when zoomed in on medal
   const showMedalExitPrompt = isMedalZoomed;
+  
+  // Show window pullup prompt when on window and not already pulling up
+  const currentPlatform = getPlatform(catState.platform);
+  const showWindowPullupPrompt = currentPlatform?.type === 'window' && !catState.startPullup && !isModalOpen && !isMedalZoomed;
 
   return (
     <div className="room-page">
@@ -204,6 +208,11 @@ export function RoomPage({ tracks, currentUser, accessToken }: RoomPageProps) {
       <InteractionPrompt
         message="to exit"
         visible={showMedalExitPrompt}
+      />
+      
+      <InteractionPrompt
+        message="to do pullup on window"
+        visible={showWindowPullupPrompt}
       />
 
       <RecordModal

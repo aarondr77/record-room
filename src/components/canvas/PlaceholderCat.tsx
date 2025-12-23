@@ -18,7 +18,6 @@ const JUMP_MIN_HEIGHT = 0.18;
 const JUMP_MAX_HEIGHT = 0.42;
 
 // Window hanging animation constants
-const WINDOW_PAUSE_DURATION = 1.0; // seconds to pause before swinging starts
 const WINDOW_TRANSITION_DURATION = 0.5; // seconds to transition into hanging pose
 
 function clamp01(v: number) {
@@ -364,7 +363,7 @@ export function PlaceholderCat({ catState, carryingToy = false }: PlaceholderCat
 
   // Window hanging animation state
   const windowHangRef = useRef<{
-    phase: 'none' | 'pausing' | 'transitioning' | 'swinging';
+    phase: 'none' | 'waiting' | 'transitioning' | 'swinging';
     landedTime: number; // When the cat landed on the window
     swingStartTime: number; // When swinging started
   }>({
@@ -695,9 +694,9 @@ export function PlaceholderCat({ catState, carryingToy = false }: PlaceholderCat
           // Keep the rotation at the landing direction (don't reset it)
           // The rotation is already set to jump.targetRotationY, so we preserve it
           
-          // If landing on window, start the pause phase
+          // If landing on window, start the waiting phase (waiting for user to press Space)
           if (platformData.type === 'window') {
-            windowHangRef.current.phase = 'pausing';
+            windowHangRef.current.phase = 'waiting';
             windowHangRef.current.landedTime = state.clock.elapsedTime;
           } else {
             windowHangRef.current.phase = 'none';
@@ -730,14 +729,20 @@ export function PlaceholderCat({ catState, carryingToy = false }: PlaceholderCat
         const isOnWindow = platformData.type === 'window';
         
         // === WINDOW HANGING ANIMATION ===
+        // Check if pullup was triggered (via catState.startPullup)
+        const shouldStartPullup = (catState as any).startPullup === true;
+        const prevStartPullup = (windowHangRef.current as any).prevStartPullup ?? false;
+        
+        if (isOnWindow && windowHang.phase === 'waiting' && shouldStartPullup && !prevStartPullup) {
+          // User pressed Space, start the pullup animation
+          windowHang.phase = 'transitioning';
+          windowHang.swingStartTime = state.clock.elapsedTime;
+          (windowHangRef.current as any).prevStartPullup = true;
+        }
+        
         if (isOnWindow && windowHang.phase !== 'none') {
-          const timeSinceLanding = state.clock.elapsedTime - windowHang.landedTime;
-          
           // Phase transitions
-          if (windowHang.phase === 'pausing' && timeSinceLanding >= WINDOW_PAUSE_DURATION) {
-            windowHang.phase = 'transitioning';
-            windowHang.swingStartTime = state.clock.elapsedTime;
-          } else if (windowHang.phase === 'transitioning') {
+          if (windowHang.phase === 'transitioning') {
             const transitionT = (state.clock.elapsedTime - windowHang.swingStartTime) / WINDOW_TRANSITION_DURATION;
             if (transitionT >= 1) {
               windowHang.phase = 'swinging';
@@ -763,8 +768,8 @@ export function PlaceholderCat({ catState, carryingToy = false }: PlaceholderCat
             tailMesh.scale.copy(tailBase.scale);
           }
           
-          if (windowHang.phase === 'pausing') {
-            // Just sitting normally during pause, maybe looking around
+          if (windowHang.phase === 'waiting') {
+            // Waiting for user to press Space - just sitting normally, maybe looking around
             const lookTime = state.clock.elapsedTime * 1.5;
             head.rotation.y += Math.sin(lookTime) * 0.2; // Look left and right
             head.rotation.x -= 0.1; // Look up at window
@@ -858,6 +863,10 @@ export function PlaceholderCat({ catState, carryingToy = false }: PlaceholderCat
           // Reset window hang state when not on window
           if (!isOnWindow) {
             windowHang.phase = 'none';
+            (windowHangRef.current as any).prevStartPullup = false;
+          } else if (isOnWindow && !shouldStartPullup) {
+            // Reset the pullup trigger flag when it's cleared
+            (windowHangRef.current as any).prevStartPullup = false;
           }
           
           // Update rotation based on facing direction (for floor movement)

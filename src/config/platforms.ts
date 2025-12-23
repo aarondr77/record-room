@@ -3,8 +3,6 @@ import { Platform, FLOOR_PLATFORM_ID, FLOOR_Y, FLOOR_Z } from '../types';
 // Dynamic platform generation constants
 const ITEM_SIZE = 2; // Size of each record/window
 const WALL_HEIGHT = 6; // Total wall height in 3D units
-const RECORDS_PER_SHELF = 1; // Number of records per shelf initially
-const RECORD_SPACING = 2.2; // Space between records on a shelf
 const GAP_WIDTH = 0.5; // Gap between columns
 const GAP_HEIGHT = 0.5; // Gap between rows
 const VERTICAL_OFFSET = 0.6; // Move everything up by this amount
@@ -15,23 +13,41 @@ export const FLOOR_BOUNDS = {
   maxX: 15,
 };
 
+// ===== SPECIAL OBJECT POSITION CONFIGURATION =====
+// Configure positions of special objects (window, medal, etc.) in the grid
+// Row 0 = top shelf, Row 1 = bottom shelf
+// Column 0 = leftmost position, Column 1+ = shelf positions
+export type SpecialObjectType = 'window' | 'medal';
+
+export interface SpecialObjectPosition {
+  type: SpecialObjectType;
+  row: number;
+  col: number;
+}
+
+// Array of special objects - you can add multiple windows, medals, etc.
+export const SPECIAL_OBJECT_POSITIONS: SpecialObjectPosition[] = [
+  { type: 'window', row: 0, col: 2 },
+  { type: 'medal', row: 1, col: 4 },
+  { type: 'window', row: 0, col: 5 },
+];
+
 // Calculate position for a platform at a given row and column
-function calculatePosition(row: number, col: number, isWindow: boolean = false): { x: number; y: number; z: number } {
-  // Window is always at column 0, row 0
-  if (isWindow) {
-    const startX = -4; // Fixed position for window
-    const startY = (WALL_HEIGHT / 2) - GAP_HEIGHT - (ITEM_SIZE / 2) + VERTICAL_OFFSET;
-    return {
-      x: startX,
-      y: startY,
-      z: 0.1, // Slightly in front of wall
-    };
-  }
+// All columns use the same positioning formula for consistency
+function calculatePosition(row: number, col: number): { x: number; y: number; z: number } {
+  // Base X position for column 0
+  const BASE_X = -4;
   
-  // For shelves, calculate position based on column
-  // Column 0 is window, so shelves start at column 1
-  const shelfCol = col - 1;
-  const startX = -4 + ITEM_SIZE + GAP_WIDTH + (shelfCol * (ITEM_SIZE + GAP_WIDTH));
+  // Calculate X position: column 0 is at BASE_X, each subsequent column adds spacing
+  // Column 0: BASE_X
+  // Column 1: BASE_X + ITEM_SIZE + GAP_WIDTH
+  // Column 2: BASE_X + ITEM_SIZE + GAP_WIDTH + (ITEM_SIZE + GAP_WIDTH)
+  // etc.
+  const startX = col === 0 
+    ? BASE_X 
+    : BASE_X + ITEM_SIZE + GAP_WIDTH + ((col - 1) * (ITEM_SIZE + GAP_WIDTH));
+  
+  // Calculate Y position based on row
   const startY = (WALL_HEIGHT / 2) - GAP_HEIGHT - (ITEM_SIZE / 2) - (row * (ITEM_SIZE + GAP_HEIGHT)) + VERTICAL_OFFSET;
   
   return {
@@ -45,10 +61,6 @@ function calculatePosition(row: number, col: number, isWindow: boolean = false):
 let cachedPlatforms: Record<number, Platform> | null = null;
 let cachedTrackCount: number = 0;
 
-// Medal case position in grid (row 0, column 3 = first row, three in from left)
-const MEDAL_ROW = 0;
-const MEDAL_COL = 3;
-
 // Generate platforms dynamically based on track count
 export function generatePlatforms(trackCount: number): Record<number, Platform> {
   // Return cached platforms if track count hasn't changed
@@ -60,44 +72,59 @@ export function generatePlatforms(trackCount: number): Record<number, Platform> 
   let platformId = 0;
   let trackIndex = 0;
   
-  // Row 0: Window at (0,0)
-  const windowId = platformId++;
-  platforms[windowId] = {
-    id: windowId,
-    grid: { row: 0, col: 0 },
-    position: calculatePosition(0, 0, true),
-    connections: { left: null, right: null, up: null, down: null },
-    type: 'window',
-    records: [],
-  };
+  // Create all special objects (windows, medals, etc.) from configuration
+  const specialObjectIds: Record<string, number[]> = { window: [], medal: [] };
+  const occupiedPositions = new Set<string>(); // Track occupied positions as "row,col"
+  
+  SPECIAL_OBJECT_POSITIONS.forEach((config) => {
+    const positionKey = `${config.row},${config.col}`;
+    if (occupiedPositions.has(positionKey)) {
+      console.warn(`Position (${config.row}, ${config.col}) is already occupied, skipping ${config.type}`);
+      return;
+    }
+    
+    const specialId = platformId++;
+    platforms[specialId] = {
+      id: specialId,
+      grid: { row: config.row, col: config.col },
+      position: calculatePosition(config.row, config.col),
+      connections: { left: null, right: null, up: null, down: null },
+      type: config.type,
+      records: [],
+    };
+    
+    specialObjectIds[config.type].push(specialId);
+    occupiedPositions.add(positionKey);
+  });
   
   // Generate shelves in 2 rows, extending to the right
-  // Special items (medal) are placed at specific positions, tracks fill remaining slots
+  // Special items are placed at specific positions, tracks fill remaining slots
   const ROWS = 2;
   const shelvesByRow: Record<number, Platform[]> = { 0: [], 1: [] };
-  let medalId: number | null = null;
   
-  // Calculate how many columns we need (accounting for medal taking one slot)
-  // Medal is at row 0, col 3, so it uses one slot in the top row
-  const columnsNeeded = Math.ceil((trackCount + 1) / ROWS); // +1 for medal slot
+  // Calculate how many columns we need (accounting for special objects taking slots)
+  const specialObjectCount = SPECIAL_OBJECT_POSITIONS.length;
+  const columnsNeeded = Math.ceil((trackCount + specialObjectCount) / ROWS);
   
-  // Create platforms column by column
-  for (let col = 1; col <= columnsNeeded; col++) {
+  // Create platforms column by column, starting from column 0
+  // Skip positions already occupied by special objects
+  for (let col = 0; col <= columnsNeeded; col++) {
     for (let row = 0; row < ROWS; row++) {
-      // Check if this is the medal position
-      if (row === MEDAL_ROW && col === MEDAL_COL) {
-        // Create medal platform instead of shelf
-        medalId = platformId++;
-        platforms[medalId] = {
-          id: medalId,
-          grid: { row, col },
-          position: calculatePosition(row, col),
-          connections: { left: null, right: null, up: null, down: null },
-          type: 'medal',
-          records: [], // Medal has no records
-        };
-        shelvesByRow[row].push(platforms[medalId]);
-        continue; // Don't assign a track to this position
+      const positionKey = `${row},${col}`;
+      
+      // Skip if this position is occupied by a special object
+      if (occupiedPositions.has(positionKey)) {
+        // Check if it's a medal or window that should be in shelvesByRow
+        const specialObj = SPECIAL_OBJECT_POSITIONS.find(s => s.row === row && s.col === col);
+        if (specialObj && (specialObj.type === 'medal' || specialObj.type === 'window')) {
+          const specialPlatform = Object.values(platforms).find(
+            p => p.grid.row === row && p.grid.col === col
+          );
+          if (specialPlatform) {
+            shelvesByRow[row].push(specialPlatform);
+          }
+        }
+        continue;
       }
       
       if (trackIndex >= trackCount) break;
@@ -150,57 +177,172 @@ export function generatePlatforms(trackCount: number): Record<number, Platform> 
     }
   };
 
-  // Set up connections for shelves and medal (all navigable platforms)
+  // Helper to find a special object (window/medal) at a specific position
+  const findSpecialObjectAt = (row: number, col: number): Platform | undefined => {
+    return Object.values(platforms).find(
+      p => (p.type === 'window' || p.type === 'medal') && p.grid.row === row && p.grid.col === col
+    );
+  };
+  
+  // Set up connections for shelves and medals (all navigable platforms)
   Object.values(platforms).forEach(platform => {
     if (platform.type === 'shelf' || platform.type === 'medal') {
       const { row, col } = platform.grid;
       
-      // Left connection
-      if (col === 1) {
-        // First column: connect to window if top row, or platform above if bottom row
-        if (row === 0) {
-          platform.connections.left = windowId;
+      // Left connection: connect to whatever is in the previous column (col - 1)
+      if (col > 0) {
+        // Check if there's a special object (window/medal) in previous column, same row
+        const leftSpecial = findSpecialObjectAt(row, col - 1);
+        if (leftSpecial) {
+          platform.connections.left = leftSpecial.id;
         } else {
-          const platformAbove = findPlatformInRow(0, col, 'exact');
-          platform.connections.left = platformAbove?.id ?? null;
+          // Otherwise, find platform in same row, previous column
+          const leftPlatform = findPlatformInRow(row, col - 1, 'exact');
+          platform.connections.left = leftPlatform?.id ?? null;
         }
       } else {
-        // Other columns: connect to platform in same row, previous column
-        const leftPlatform = findPlatformInRow(row, col, 'left');
-        platform.connections.left = leftPlatform?.id ?? null;
+        // Column 0: no left connection
+        platform.connections.left = null;
       }
       
-      // Right connection
+      // Right connection: connect to platform in same row, next column
       const rightPlatform = findPlatformInRow(row, col, 'right');
-      platform.connections.right = rightPlatform?.id ?? null;
+      if (rightPlatform) {
+        platform.connections.right = rightPlatform.id;
+      } else {
+        // Check if there's a special object to the right
+        const rightSpecial = findSpecialObjectAt(row, col + 1);
+        platform.connections.right = rightSpecial?.id ?? null;
+      }
       
-      // Up connection (only for bottom row)
+      // Up connection (only for bottom row, which is row 1)
       if (row === 1) {
-        const platformAbove = findPlatformInRow(0, col, 'exact');
-        platform.connections.up = platformAbove?.id ?? null;
+        // Check if there's a special object above (same column, row 0)
+        const upSpecial = findSpecialObjectAt(0, col);
+        if (upSpecial) {
+          platform.connections.up = upSpecial.id;
+        } else {
+          const platformAbove = findPlatformInRow(0, col, 'exact');
+          platform.connections.up = platformAbove?.id ?? null;
+        }
       }
       
       // Down connection
       if (row === 0) {
-        // Top row: connect down to platform below
-        const platformBelow = findPlatformInRow(1, col, 'exact');
-        platform.connections.down = platformBelow?.id ?? null;
-      } else if (row === 1) {
-        // Bottom row: connect down to floor
+        // Top row: check if there's a special object below (same column, row 1)
+        const downSpecial = findSpecialObjectAt(1, col);
+        if (downSpecial) {
+          platform.connections.down = downSpecial.id;
+        } else {
+          const platformBelow = findPlatformInRow(1, col, 'exact');
+          platform.connections.down = platformBelow?.id ?? null;
+        }
+      } else {
+        // Bottom row (row === 1): connect down to floor
         platform.connections.down = FLOOR_PLATFORM_ID;
       }
     }
   });
   
-  // Update window connections
-  const firstTopShelf = shelvesByRow[0][0];
-  const firstBottomShelf = shelvesByRow[1][0];
-  if (firstTopShelf) {
-    platforms[windowId].connections.right = firstTopShelf.id;
-  }
-  if (firstBottomShelf) {
-    platforms[windowId].connections.down = firstBottomShelf.id;
-  }
+  // Update connections for all windows and medals
+  specialObjectIds.window.forEach(windowId => {
+    const window = platforms[windowId];
+    if (!window) return;
+    
+    const { row: windowRow, col: windowCol } = window.grid;
+    
+    // Right: next platform in same row
+    const rightPlatform = findPlatformInRow(windowRow, windowCol, 'right');
+    if (rightPlatform) {
+      window.connections.right = rightPlatform.id;
+    } else {
+      // Check if there's a special object to the right
+      const rightSpecial = findSpecialObjectAt(windowRow, windowCol + 1);
+      window.connections.right = rightSpecial?.id ?? null;
+    }
+    
+    // Left: previous platform in same row (if col > 0)
+    if (windowCol > 0) {
+      const leftPlatform = findPlatformInRow(windowRow, windowCol - 1, 'exact');
+      if (leftPlatform) {
+        window.connections.left = leftPlatform.id;
+      } else {
+        // Check if there's a special object to the left
+        const leftSpecial = findSpecialObjectAt(windowRow, windowCol - 1);
+        window.connections.left = leftSpecial?.id ?? null;
+      }
+    }
+    
+    // Up: platform above (if window is on bottom row)
+    if (windowRow === 1) {
+      const platformAbove = findPlatformInRow(0, windowCol, 'exact');
+      if (platformAbove) {
+        window.connections.up = platformAbove.id;
+      } else {
+        const upSpecial = findSpecialObjectAt(0, windowCol);
+        window.connections.up = upSpecial?.id ?? null;
+      }
+      // Window is on bottom row, so it can connect down to floor
+      window.connections.down = FLOOR_PLATFORM_ID;
+    } else {
+      // Window is on top row (row 0), connect down to platform below
+      const platformBelow = findPlatformInRow(1, windowCol, 'exact');
+      if (platformBelow) {
+        window.connections.down = platformBelow.id;
+      } else {
+        const downSpecial = findSpecialObjectAt(1, windowCol);
+        window.connections.down = downSpecial?.id ?? null;
+      }
+    }
+  });
+  
+  // Update connections for medals (similar to windows)
+  specialObjectIds.medal.forEach(medalId => {
+    const medal = platforms[medalId];
+    if (!medal) return;
+    
+    const { row: medalRow, col: medalCol } = medal.grid;
+    
+    // Right: next platform in same row
+    const rightPlatform = findPlatformInRow(medalRow, medalCol, 'right');
+    if (rightPlatform) {
+      medal.connections.right = rightPlatform.id;
+    } else {
+      const rightSpecial = findSpecialObjectAt(medalRow, medalCol + 1);
+      medal.connections.right = rightSpecial?.id ?? null;
+    }
+    
+    // Left: previous platform in same row (if col > 0)
+    if (medalCol > 0) {
+      const leftPlatform = findPlatformInRow(medalRow, medalCol - 1, 'exact');
+      if (leftPlatform) {
+        medal.connections.left = leftPlatform.id;
+      } else {
+        const leftSpecial = findSpecialObjectAt(medalRow, medalCol - 1);
+        medal.connections.left = leftSpecial?.id ?? null;
+      }
+    }
+    
+    // Up/Down connections
+    if (medalRow === 1) {
+      const platformAbove = findPlatformInRow(0, medalCol, 'exact');
+      if (platformAbove) {
+        medal.connections.up = platformAbove.id;
+      } else {
+        const upSpecial = findSpecialObjectAt(0, medalCol);
+        medal.connections.up = upSpecial?.id ?? null;
+      }
+      medal.connections.down = FLOOR_PLATFORM_ID;
+    } else {
+      const platformBelow = findPlatformInRow(1, medalCol, 'exact');
+      if (platformBelow) {
+        medal.connections.down = platformBelow.id;
+      } else {
+        const downSpecial = findSpecialObjectAt(1, medalCol);
+        medal.connections.down = downSpecial?.id ?? null;
+      }
+    }
+  });
   
   // Floor platform connections: up connects to all bottom row shelves
   // We'll handle floor movement specially in the movement hook
