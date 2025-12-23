@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface SpotifyPlayerState {
   isPlaying: boolean;
@@ -9,7 +9,11 @@ interface SpotifyPlayerState {
   duration: number; // Track duration in ms
 }
 
-export function useSpotifyPlayer(accessToken: string | null) {
+interface UseSpotifyPlayerOptions {
+  onTrackEnd?: () => void;
+}
+
+export function useSpotifyPlayer(accessToken: string | null, options?: UseSpotifyPlayerOptions) {
   const [state, setState] = useState<SpotifyPlayerState>({
     isPlaying: false,
     currentTrack: null,
@@ -21,6 +25,17 @@ export function useSpotifyPlayer(accessToken: string | null) {
   const [error, setError] = useState<string | null>(null);
   const playerRef = useRef<Spotify.Player | null>(null);
   const positionIntervalRef = useRef<number | null>(null);
+  // Track previous state to detect when a track naturally ends
+  const prevStateRef = useRef<{ trackUri: string | null; isPlaying: boolean }>({
+    trackUri: null,
+    isPlaying: false,
+  });
+  const onTrackEndRef = useRef(options?.onTrackEnd);
+
+  // Keep the callback ref up to date
+  useEffect(() => {
+    onTrackEndRef.current = options?.onTrackEnd;
+  }, [options?.onTrackEnd]);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -56,6 +71,32 @@ export function useSpotifyPlayer(accessToken: string | null) {
           }
           return;
         }
+
+        const currentTrackUri = playerState.track_window?.current_track?.uri || null;
+        const wasPlaying = prevStateRef.current.isPlaying;
+        const prevTrackUri = prevStateRef.current.trackUri;
+        const isNowPaused = playerState.paused;
+
+        // Detect when a track naturally ends:
+        // - Was playing, now paused
+        // - Track changed (next track in queue) or position reset
+        // - Position is at 0 (track ended and reset)
+        const trackChanged = prevTrackUri !== null && currentTrackUri !== prevTrackUri;
+        const trackEndedNaturally = wasPlaying && isNowPaused && playerState.position === 0 && !trackChanged;
+        
+        if (trackEndedNaturally && onTrackEndRef.current) {
+          // Small delay to ensure state is updated before playing next track
+          setTimeout(() => {
+            onTrackEndRef.current?.();
+          }, 100);
+        }
+
+        // Update previous state
+        prevStateRef.current = {
+          trackUri: currentTrackUri,
+          isPlaying: !playerState.paused,
+        };
+
         setState((prev) => ({
           ...prev,
           isPlaying: !playerState.paused,

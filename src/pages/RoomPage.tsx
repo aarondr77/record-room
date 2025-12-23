@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Room } from '../components/canvas/Room';
 import { RecordModal } from '../components/ui/RecordModal';
 import { NowPlayingBar } from '../components/ui/NowPlayingBar';
@@ -79,7 +79,42 @@ export function RoomPage({ tracks, currentUser, accessToken }: RoomPageProps) {
   
   // Only fetch notes when modal is open
   const { notes, isLoading: isLoadingNotes, createNote, deleteNote } = useNotes(trackId, isModalOpen);
-  const { isPlaying, currentTrack, playTrack, togglePlay, position, duration } = useSpotifyPlayer(accessToken);
+  
+  // Track current playing index for auto-play next
+  const currentPlayingIndexRef = useRef<number | null>(null);
+  
+  // Callback when a track ends - play the next one
+  const handleTrackEnd = useCallback(() => {
+    const currentIndex = currentPlayingIndexRef.current;
+    if (currentIndex !== null && currentIndex < tracks.length - 1) {
+      const nextIndex = currentIndex + 1;
+      const nextTrack = tracks[nextIndex];
+      currentPlayingIndexRef.current = nextIndex;
+      // playTrack will be available from the hook
+      // We need to call it via a ref since the hook isn't initialized yet
+      playTrackRef.current?.(nextTrack.uri);
+    }
+  }, [tracks]);
+  
+  const { isPlaying, currentTrack, playTrack, togglePlay, position, duration } = useSpotifyPlayer(accessToken, {
+    onTrackEnd: handleTrackEnd,
+  });
+  
+  // Keep playTrack ref updated for the callback
+  const playTrackRef = useRef(playTrack);
+  useEffect(() => {
+    playTrackRef.current = playTrack;
+  }, [playTrack]);
+  
+  // Update current playing index when track changes
+  useEffect(() => {
+    if (currentTrack) {
+      const index = tracks.findIndex(t => t.uri === currentTrack.uri);
+      if (index !== -1) {
+        currentPlayingIndexRef.current = index;
+      }
+    }
+  }, [currentTrack, tracks]);
 
   // Handle Space key to open modal or zoom medal
   useEffect(() => {
