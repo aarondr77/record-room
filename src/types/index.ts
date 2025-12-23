@@ -62,12 +62,19 @@ export interface CatState {
   isMoving: boolean;
   floorX: number; // X position when on floor (continuous, not discrete)
   carryingToy: boolean;
+  wearingHat: boolean;
 }
 
 // Toy state for lobster toy
 export interface ToyState {
   position: { x: number; y: number; z: number };
   isCarried: boolean;
+}
+
+// Hat state for baseball hat
+export interface HatState {
+  position: { x: number; y: number; z: number };
+  isWorn: boolean;
 }
 
 // 3D Scene types

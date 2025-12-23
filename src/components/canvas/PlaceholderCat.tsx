@@ -4,10 +4,12 @@ import { useFrame } from '@react-three/fiber';
 import { getPlatform } from '../../config/platforms';
 import type { CatState } from '../../types';
 import { FLOOR_Y, FLOOR_Z } from '../../types';
+import { WornBaseballHat } from './BaseballHat';
 
 interface PlaceholderCatProps {
   catState: CatState & { currentTrackIndex: number | null };
   carryingToy?: boolean;
+  wearingHat?: boolean;
   isPlaying?: boolean;
 }
 
@@ -344,8 +346,9 @@ function createCatModel(): {
   };
 }
 
-export function PlaceholderCat({ catState, carryingToy = false, isPlaying = false }: PlaceholderCatProps) {
+export function PlaceholderCat({ catState, carryingToy = false, wearingHat = false, isPlaying = false }: PlaceholderCatProps) {
   const catRef = useRef<Group>(null);
+  const hatRef = useRef<Group>(null);
   const { platform, recordIndex, facing, isMoving, floorX } = catState;
 
   const jumpRef = useRef<{
@@ -1005,6 +1008,26 @@ export function PlaceholderCat({ catState, carryingToy = false, isPlaying = fals
           catModel.scale.set(CAT_SCALE * breathScale, CAT_SCALE, CAT_SCALE * breathScale);
         }
       }
+      
+      // === HAT SYNC: Make hat follow the head group's transforms ===
+      if (hatRef.current && wearingHat) {
+        // Sync hat rotation with head group (so hat tilts with head)
+        hatRef.current.rotation.copy(headGroup.rotation);
+        // Position hat to sit on top of head (not floating)
+        // Head center is at (0, 0.42, 0.08) in headGroup's local space
+        // Head radius is ~0.14, so top of head is at y ≈ 0.56
+        // Hat should sit lower, with the sweatband fitting around the head
+        const headLocalY = 0.42; // Head center Y in headGroup space
+        const headLocalZ = 0.08; // Head center Z in headGroup space
+        const headRadius = 0.14; // Approximate head radius
+        // Position hat so it sits on the head (sweatband fits around top of head)
+        // Use a smaller offset so hat doesn't float
+        hatRef.current.position.set(
+          headGroup.position.x,
+          headGroup.position.y + headLocalY + headRadius * 0.6 + 0.1, // Sit on head, not floating
+          headGroup.position.z + headLocalZ - 0.01 // Slightly back so brim extends backward
+        );
+      }
     }
   });
 
@@ -1047,6 +1070,13 @@ export function PlaceholderCat({ catState, carryingToy = false, isPlaying = fals
             <sphereGeometry args={[0.25, 6, 4]} />
             <primitive object={carriedToyMaterial} attach="material" />
           </mesh>
+        </group>
+      )}
+      {/* Render baseball hat on head when wearing */}
+      {/* Hat ref is synced with headGroup transforms in useFrame */}
+      {wearingHat && (
+        <group ref={hatRef}>
+          <WornBaseballHat />
         </group>
       )}
     </group>

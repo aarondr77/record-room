@@ -10,13 +10,14 @@ import { MedalCase } from './MedalCase';
 import { PlaceholderCat } from './PlaceholderCat';
 import { CameraFollow } from './CameraFollow';
 import { LobsterToy } from './LobsterToy';
+import { BaseballHat } from './BaseballHat';
 import { ChristmasLights } from './ChristmasLights';
 import { FloorLamp } from './FloorLamp';
 import { ArcLamp } from './ArcLamp';
 import { ShelfLamp } from './ShelfLamp';
 import { PothosPlant } from './PothosPlant';
 import { getAllPlatforms, generatePlatforms, calculateWallWidth } from '../../config/platforms';
-import type { SpotifyTrack, ToyState } from '../../types';
+import type { SpotifyTrack, ToyState, HatState } from '../../types';
 import type { CatState } from '../../types';
 import { FLOOR_Y, FLOOR_Z } from '../../types';
 
@@ -24,13 +25,14 @@ interface RoomProps {
   tracks: SpotifyTrack[];
   catState: CatState & { currentTrackIndex: number | null };
   toyState: ToyState;
+  hatState: HatState;
   onRecordClick?: (trackIndex: number) => void;
   isZoomed?: boolean;
   zoomTarget?: { x: number; y: number; z: number };
   isPlaying?: boolean;
 }
 
-export function Room({ tracks, catState, toyState, onRecordClick, isZoomed, zoomTarget, isPlaying = false }: RoomProps) {
+export function Room({ tracks, catState, toyState, hatState, onRecordClick, isZoomed, zoomTarget, isPlaying = false }: RoomProps) {
   // Generate platforms dynamically based on track count
   const platforms = useMemo(() => getAllPlatforms(tracks.length), [tracks.length]);
   
@@ -103,8 +105,21 @@ export function Room({ tracks, catState, toyState, onRecordClick, isZoomed, zoom
         />
       )}
       
+      {/* Baseball hat on floor - only show when not being worn */}
+      {!hatState.isWorn && (
+        <BaseballHat 
+          position={[hatState.position.x, FLOOR_Y, FLOOR_Z]} 
+          isWorn={hatState.isWorn}
+        />
+      )}
+      
       {/* Cat */}
-      <PlaceholderCat catState={catState} carryingToy={toyState.isCarried} isPlaying={isPlaying} />
+      <PlaceholderCat 
+        catState={catState} 
+        carryingToy={toyState.isCarried} 
+        wearingHat={hatState.isWorn}
+        isPlaying={isPlaying} 
+      />
       
       {/* Floor lamp with warm yellow glow - left side */}
       <FloorLamp position={[-4, FLOOR_Y, FLOOR_Z + 0.5]} />

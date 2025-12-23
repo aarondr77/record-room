@@ -109,7 +109,7 @@ export function FloorLamp({ position = [-4, FLOOR_Y, FLOOR_Z + 0.5] }: FloorLamp
       {/* Main warm yellow point light */}
       <pointLight
         position={[0, lightY, 0]}
-        color="#f2a02e"
+        color="#FFCC44"
         intensity={3}
         distance={10}
         decay={2}

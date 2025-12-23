@@ -9,7 +9,7 @@ import { useCatMovement } from '../hooks/useCatMovement';
 import { useNotes } from '../hooks/useNotes';
 import { useSpotifyPlayer } from '../hooks/useSpotifyPlayer';
 import { getMedalPlatform, getPlatform } from '../config/platforms';
-import type { SpotifyTrack, SpotifyUser, ToyState } from '../types';
+import type { SpotifyTrack, SpotifyUser, ToyState, HatState } from '../types';
 import { FLOOR_Y, FLOOR_Z } from '../types';
 import './RoomPage.css';
 
@@ -23,11 +23,20 @@ interface RoomPageProps {
 // Initial toy position on the floor
 const INITIAL_TOY_POSITION = { x: 2, y: FLOOR_Y, z: FLOOR_Z };
 
+// Initial hat position on the floor (different from toy)
+const INITIAL_HAT_POSITION = { x: -2, y: FLOOR_Y, z: FLOOR_Z };
+
 export function RoomPage({ tracks, currentUser, accessToken }: RoomPageProps) {
   // Toy state management
   const [toyState, setToyState] = useState<ToyState>({
     position: INITIAL_TOY_POSITION,
     isCarried: false,
+  });
+
+  // Hat state management
+  const [hatState, setHatState] = useState<HatState>({
+    position: INITIAL_HAT_POSITION,
+    isWorn: false,
   });
 
   // Handlers for toy pickup and drop
@@ -42,11 +51,26 @@ export function RoomPage({ tracks, currentUser, accessToken }: RoomPageProps) {
     });
   }, []);
 
+  // Handlers for hat pickup and drop
+  const handlePickupHat = useCallback(() => {
+    setHatState(prev => ({ ...prev, isWorn: true }));
+  }, []);
+
+  const handleDropHat = useCallback((x: number, z: number) => {
+    setHatState({
+      position: { x, y: FLOOR_Y, z },
+      isWorn: false,
+    });
+  }, []);
+
   const catState = useCatMovement({ 
     trackCount: tracks.length,
     toyState,
+    hatState,
     onPickupToy: handlePickupToy,
     onDropToy: handleDropToy,
+    onPickupHat: handlePickupHat,
+    onDropHat: handleDropHat,
   });
   
   const [selectedTrackIndex, setSelectedTrackIndex] = useState<number | null>(null);
@@ -186,6 +210,9 @@ export function RoomPage({ tracks, currentUser, accessToken }: RoomPageProps) {
   // Show toy prompt when near toy on floor and not carrying
   const showToyPrompt = catState.isNearToy && !toyState.isCarried && !isModalOpen && !isMedalZoomed;
   
+  // Show hat prompt when near hat on floor and not wearing
+  const showHatPrompt = catState.isNearHat && !hatState.isWorn && !isModalOpen && !isMedalZoomed;
+  
   // Show medal prompt when near medal (not zoomed in yet)
   const showMedalPrompt = isNearMedal && !isMedalZoomed && !isModalOpen;
   
@@ -205,6 +232,7 @@ export function RoomPage({ tracks, currentUser, accessToken }: RoomPageProps) {
           tracks={tracks}
           catState={catState}
           toyState={toyState}
+          hatState={hatState}
           onRecordClick={handleRecordClick}
           isZoomed={isMedalZoomed}
           zoomTarget={zoomTarget}
@@ -220,6 +248,11 @@ export function RoomPage({ tracks, currentUser, accessToken }: RoomPageProps) {
       <InteractionPrompt
         message="to pick up toy"
         visible={showToyPrompt}
+      />
+      
+      <InteractionPrompt
+        message="to put on hat"
+        visible={showHatPrompt}
       />
       
       <InteractionPrompt
