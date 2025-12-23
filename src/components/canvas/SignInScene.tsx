@@ -5,7 +5,11 @@ import { Floor } from './Floor';
 import { Window } from './Window';
 import { LoveLetter } from './LoveLetter';
 
-export function SignInScene() {
+interface SignInSceneProps {
+  onEnter?: () => void;
+}
+
+export function SignInScene({ onEnter }: SignInSceneProps) {
   return (
     <Canvas shadows>
       <PerspectiveCamera makeDefault position={[0, 0, 8]} fov={60} />
@@ -26,7 +30,7 @@ export function SignInScene() {
       <Window position={[-3, 2, 0.1]} hasPlatform={true} />
       
       {/* Love letter with spotlight effect */}
-      <LoveLetter position={[2, 2, 0.1]} />
+      <LoveLetter position={[2, 2, 0.1]} onEnter={onEnter} />
       
       {/* Warm golden spotlight pointing at love letter */}
       <spotLight

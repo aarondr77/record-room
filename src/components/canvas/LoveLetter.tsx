@@ -1,26 +1,27 @@
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useState } from 'react';
 import { Mesh } from 'three';
 import { Text } from '@react-three/drei';
 
 interface LoveLetterProps {
   position?: [number, number, number];
+  onEnter?: () => void;
 }
 
-export function LoveLetter({ position = [0, 2, 0] }: LoveLetterProps) {
+export function LoveLetter({ position = [0, 2, 0], onEnter }: LoveLetterProps) {
   const letterRef = useRef<Mesh>(null);
   const textRef = useRef<any>(null);
+  const [isHovered, setIsHovered] = useState(false);
 
   const LETTER_DEPTH = 0.05;
   const PADDING = 0.4; // Padding around text in all directions
   const FONT_SIZE = 0.25;
   
+  // Main text without "Come in."
   const letterText = `This is our record room.
 
 A place for our songs,
 our trinkets,
 and us.
-
-Come in.
 `
 
   // Calculate text dimensions based on content
@@ -318,15 +319,37 @@ Come in.
       {/* Letter text */}
       <Text
         ref={textRef}
-        position={[0, LETTER_HEIGHT / 2 - PADDING, Z_FRONT + LETTER_DEPTH + 0.01]}
+        position={[-LETTER_WIDTH / 2 + PADDING, LETTER_HEIGHT / 2 - PADDING, Z_FRONT + LETTER_DEPTH + 0.01]}
         fontSize={FONT_SIZE}
         color="#2C1810"
-        anchorX="center"
+        anchorX="left"
         anchorY="top"
         maxWidth={LETTER_WIDTH - (PADDING * 2)}
         textAlign="left"
       >
         {letterText}
+      </Text>
+      
+      {/* "Come in." as clickable link - positioned with blank line gap after main text */}
+      <Text
+        position={[-LETTER_WIDTH / 2 + PADDING, LETTER_HEIGHT / 2 - PADDING - FONT_SIZE * 7.5, Z_FRONT + LETTER_DEPTH + 0.01]}
+        fontSize={FONT_SIZE}
+        color={isHovered ? "#8B4513" : "#2C1810"}
+        anchorX="left"
+        anchorY="top"
+        maxWidth={LETTER_WIDTH - (PADDING * 2)}
+        textAlign="left"
+        onClick={onEnter}
+        onPointerOver={() => {
+          setIsHovered(true);
+          document.body.style.cursor = 'pointer';
+        }}
+        onPointerOut={() => {
+          setIsHovered(false);
+          document.body.style.cursor = 'auto';
+        }}
+      >
+        {isHovered ? '→ Come in.' : 'Come in.'}
       </Text>
     </group>
   );
