@@ -15,6 +15,10 @@ const JUMP_DURATION_S = 0.6; // slightly longer to allow body animations to be v
 const JUMP_MIN_HEIGHT = 0.18;
 const JUMP_MAX_HEIGHT = 0.42;
 
+// Window hanging animation constants
+const WINDOW_PAUSE_DURATION = 1.0; // seconds to pause before swinging starts
+const WINDOW_TRANSITION_DURATION = 0.5; // seconds to transition into hanging pose
+
 function clamp01(v: number) {
   return Math.max(0, Math.min(1, v));
 }
@@ -349,6 +353,17 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
     targetRotationY: 0,
   });
 
+  // Window hanging animation state
+  const windowHangRef = useRef<{
+    phase: 'none' | 'pausing' | 'transitioning' | 'swinging';
+    landedTime: number; // When the cat landed on the window
+    swingStartTime: number; // When swinging started
+  }>({
+    phase: 'none',
+    landedTime: 0,
+    swingStartTime: 0,
+  });
+
   const tmpPos = useMemo(() => new Vector3(), []);
 
   // Create the procedural cat model and store refs
@@ -457,6 +472,13 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
     // Calculate angle to face jump direction (cat faces +Z by default, so we need to adjust)
     // For left/right movement, we want to face the direction of travel
     const angleToTarget = Math.atan2(jumpDir.x, jumpDir.z);
+    
+    // Reset window hanging state when starting a new jump
+    windowHangRef.current.phase = 'none';
+    // Reset any rotation.z from swinging animation
+    if (catRef.current) {
+      catRef.current.rotation.z = 0;
+    }
     
     jump.active = true;
     // t0 set in useFrame to the current clock time (more reliable than Date/perf).
@@ -621,62 +643,216 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
           // Keep the rotation at the landing direction (don't reset it)
           // The rotation is already set to jump.targetRotationY, so we preserve it
           
+          // If landing on window, start the pause phase
+          if (platformData.type === 'window') {
+            windowHangRef.current.phase = 'pausing';
+            windowHangRef.current.landedTime = state.clock.elapsedTime;
+          } else {
+            windowHangRef.current.phase = 'none';
+          }
+          
           // Restore all parts to base transforms (following .cursorrules)
           if (tailMesh && tailBase) {
             tailMesh.position.copy(tailBase.pos);
             tailMesh.rotation.copy(tailBase.rot);
+            tailMesh.scale.copy(tailBase.scale);
           }
           body.position.copy(bodyBase.pos);
           body.rotation.copy(bodyBase.rot);
+          body.scale.copy(bodyBase.scale);
           head.position.copy(headBase.pos);
           head.rotation.copy(headBase.rot);
+          head.scale.copy(headBase.scale);
           frontLegsGroup.position.copy(frontLegsBase.pos);
           frontLegsGroup.rotation.copy(frontLegsBase.rot);
+          frontLegsGroup.scale.copy(frontLegsBase.scale);
           backLegsGroup.position.copy(backLegsBase.pos);
           backLegsGroup.rotation.copy(backLegsBase.rot);
+          backLegsGroup.scale.copy(backLegsBase.scale);
         }
       } else {
         // When idle (not jumping), preserve the current rotation
         // The rotation persists from the last jump, so we don't override it
-        // Not jumping: only lerp if we're close to target (to avoid interfering with jump start)
-        const distToTarget = catRef.current.position.distanceTo(targetPos);
-        if (distToTarget > 0.01) {
-          // Only lerp if we're not already very close (prevents fighting with jump animation)
-          catRef.current.position.lerp(targetPos, 0.18);
-        }
-
-        // Reset all parts to base transforms (following .cursorrules)
-        body.position.copy(bodyBase.pos);
-        body.rotation.copy(bodyBase.rot);
-        head.position.copy(headBase.pos);
-        head.rotation.copy(headBase.rot);
-        frontLegsGroup.position.copy(frontLegsBase.pos);
-        frontLegsGroup.rotation.copy(frontLegsBase.rot);
-        backLegsGroup.position.copy(backLegsBase.pos);
-        backLegsGroup.rotation.copy(backLegsBase.rot);
-
-        // Idle tail sway + breathing
-        if (tailMesh && tailBase) {
-          tailMesh.position.copy(tailBase.pos);
-          tailMesh.rotation.copy(tailBase.rot);
-
-          if (isMoving) {
-            // When moving, smaller faster sway
-            const amp = 0.35;
-            const spd = 4.5;
-            tailMesh.rotation.y += Math.sin(state.clock.elapsedTime * spd) * amp;
-            tailMesh.rotation.x += Math.sin(state.clock.elapsedTime * (spd * 0.7)) * (amp * 0.35);
-          } else {
-            // When stationary, big slow swaying motion
-            const amp = 0.8; // Much larger amplitude for big motions
-            const spd = 0.6; // Slower speed for smooth, deliberate sway
-            tailMesh.rotation.y += Math.sin(state.clock.elapsedTime * spd) * amp;
-            tailMesh.rotation.x += Math.sin(state.clock.elapsedTime * (spd * 0.8)) * (amp * 0.4);
+        
+        const windowHang = windowHangRef.current;
+        const isOnWindow = platformData.type === 'window';
+        
+        // === WINDOW HANGING ANIMATION ===
+        if (isOnWindow && windowHang.phase !== 'none') {
+          const timeSinceLanding = state.clock.elapsedTime - windowHang.landedTime;
+          
+          // Phase transitions
+          if (windowHang.phase === 'pausing' && timeSinceLanding >= WINDOW_PAUSE_DURATION) {
+            windowHang.phase = 'transitioning';
+            windowHang.swingStartTime = state.clock.elapsedTime;
+          } else if (windowHang.phase === 'transitioning') {
+            const transitionT = (state.clock.elapsedTime - windowHang.swingStartTime) / WINDOW_TRANSITION_DURATION;
+            if (transitionT >= 1) {
+              windowHang.phase = 'swinging';
+            }
           }
-        }
+          
+          // Reset to base before applying hanging pose
+          body.position.copy(bodyBase.pos);
+          body.rotation.copy(bodyBase.rot);
+          body.scale.copy(bodyBase.scale);
+          head.position.copy(headBase.pos);
+          head.rotation.copy(headBase.rot);
+          head.scale.copy(headBase.scale);
+          frontLegsGroup.position.copy(frontLegsBase.pos);
+          frontLegsGroup.rotation.copy(frontLegsBase.rot);
+          frontLegsGroup.scale.copy(frontLegsBase.scale);
+          backLegsGroup.position.copy(backLegsBase.pos);
+          backLegsGroup.rotation.copy(backLegsBase.rot);
+          backLegsGroup.scale.copy(backLegsBase.scale);
+          if (tailMesh && tailBase) {
+            tailMesh.position.copy(tailBase.pos);
+            tailMesh.rotation.copy(tailBase.rot);
+            tailMesh.scale.copy(tailBase.scale);
+          }
+          
+          if (windowHang.phase === 'pausing') {
+            // Just sitting normally during pause, maybe looking around
+            const lookTime = state.clock.elapsedTime * 1.5;
+            head.rotation.y += Math.sin(lookTime) * 0.2; // Look left and right
+            head.rotation.x -= 0.1; // Look up at window
+            
+            // Tail sways gently
+            if (tailMesh) {
+              tailMesh.rotation.y += Math.sin(state.clock.elapsedTime * 0.8) * 0.4;
+            }
+            
+          } else if (windowHang.phase === 'transitioning' || windowHang.phase === 'swinging') {
+            // Calculate transition progress (0 to 1)
+            const transitionT = windowHang.phase === 'transitioning'
+              ? easeInOutCubic(clamp01((state.clock.elapsedTime - windowHang.swingStartTime) / WINDOW_TRANSITION_DURATION))
+              : 1;
+            
+            // Move cat DOWN to hang from window frame (body hangs below hands)
+            const hangOffset = transitionT * 0.15;
+            catRef.current.position.y = targetPos.y + hangOffset;
+            
+            // Face the window (rotate to face -Z, toward the window)
+            catRef.current.rotation.y = Math.PI * transitionT; // Turn to face window
+            
+            // === HANGING POSE ===
+            // Body hangs down and slightly forward
+            body.rotation.x -= transitionT * 0.25;
+            body.position.y -= transitionT * 0.05;
+            body.position.z += transitionT * 0.03;
+            
+            // Front legs reach up above head (holding window frame)
+            // Scale legs longer so they can reach above head while staying attached
+            frontLegsGroup.scale.set(
+              1 + transitionT * 0.3,  // Slightly wider
+              1 + transitionT * 1.8,  // MUCH longer (stretch up)
+              1 + transitionT * 0.3   // Slightly deeper
+            );
+            // Rotate to point upward - less extreme rotation since legs are now longer
+            frontLegsGroup.rotation.x -= transitionT * 1.8;
+            // Position adjusted to keep attached to body while reaching up
+            // The legs start at y=-0.02, when stretched they extend more
+            frontLegsGroup.position.y += transitionT * 0.25;
+            frontLegsGroup.position.z -= transitionT * 0.05;
+            
+            // Back legs dangle down loosely
+            backLegsGroup.rotation.x += transitionT * 1.0;
+            backLegsGroup.position.y -= transitionT * 0.12;
+            // Stretch back legs slightly for dangling effect
+            backLegsGroup.scale.set(1, 1 + transitionT * 0.3, 1);
+            
+            // Head tilts up to look at paws/window frame
+            head.rotation.x -= transitionT * 0.5;
+            head.position.y += transitionT * 0.03;
+            
+            // Tail hangs down
+            if (tailMesh) {
+              tailMesh.rotation.x += transitionT * 1.4;
+            }
+            
+            // === SWINGING MOTION (only when fully in hanging pose) ===
+            if (windowHang.phase === 'swinging') {
+              const swingTime = state.clock.elapsedTime - windowHang.swingStartTime - WINDOW_TRANSITION_DURATION;
+              const swingSpeed = 2.0; // Slow, pendulum-like swing
+              const swingAmount = Math.sin(swingTime * swingSpeed);
+              
+              // Whole body swings side to side
+              catRef.current.rotation.z = swingAmount * 0.18;
+              catRef.current.position.x = targetPos.x + swingAmount * 0.15;
+              
+              // Back legs swing with momentum (delayed from body, more pronounced)
+              const legSwing = Math.sin(swingTime * swingSpeed - 0.4) * 0.35;
+              backLegsGroup.rotation.z += legSwing;
+              // Front legs (holding on) barely move
+              frontLegsGroup.rotation.z += swingAmount * 0.05;
+              
+              // Tail swings opposite to body
+              if (tailMesh) {
+                tailMesh.rotation.y += Math.sin(swingTime * swingSpeed + 0.5) * 0.6;
+                tailMesh.rotation.z -= swingAmount * 0.4;
+              }
+              
+              // Head sways slightly
+              head.rotation.z += swingAmount * 0.1;
+            }
+          }
+          
+          // Breathing
+          const breathScale = 1 + Math.sin(state.clock.elapsedTime * 2) * 0.01;
+          catModel.scale.set(CAT_SCALE * breathScale, CAT_SCALE, CAT_SCALE * breathScale);
+          
+        } else {
+          // === NORMAL IDLE (not on window or window animation not started) ===
+          // Reset window hang state when not on window
+          if (!isOnWindow) {
+            windowHang.phase = 'none';
+          }
+          
+          // Not jumping: only lerp if we're close to target (to avoid interfering with jump start)
+          const distToTarget = catRef.current.position.distanceTo(targetPos);
+          if (distToTarget > 0.01) {
+            // Only lerp if we're not already very close (prevents fighting with jump animation)
+            catRef.current.position.lerp(targetPos, 0.18);
+          }
 
-        const breathScale = 1 + Math.sin(state.clock.elapsedTime * 2) * 0.01;
-        catModel.scale.set(CAT_SCALE * breathScale, CAT_SCALE, CAT_SCALE * breathScale);
+          // Reset all parts to base transforms (following .cursorrules)
+          body.position.copy(bodyBase.pos);
+          body.rotation.copy(bodyBase.rot);
+          body.scale.copy(bodyBase.scale);
+          head.position.copy(headBase.pos);
+          head.rotation.copy(headBase.rot);
+          head.scale.copy(headBase.scale);
+          frontLegsGroup.position.copy(frontLegsBase.pos);
+          frontLegsGroup.rotation.copy(frontLegsBase.rot);
+          frontLegsGroup.scale.copy(frontLegsBase.scale);
+          backLegsGroup.position.copy(backLegsBase.pos);
+          backLegsGroup.rotation.copy(backLegsBase.rot);
+          backLegsGroup.scale.copy(backLegsBase.scale);
+
+          // Idle tail sway + breathing
+          if (tailMesh && tailBase) {
+            tailMesh.position.copy(tailBase.pos);
+            tailMesh.rotation.copy(tailBase.rot);
+            tailMesh.scale.copy(tailBase.scale);
+
+            if (isMoving) {
+              // When moving, smaller faster sway
+              const amp = 0.35;
+              const spd = 4.5;
+              tailMesh.rotation.y += Math.sin(state.clock.elapsedTime * spd) * amp;
+              tailMesh.rotation.x += Math.sin(state.clock.elapsedTime * (spd * 0.7)) * (amp * 0.35);
+            } else {
+              // When stationary, big slow swaying motion
+              const amp = 0.8; // Much larger amplitude for big motions
+              const spd = 0.6; // Slower speed for smooth, deliberate sway
+              tailMesh.rotation.y += Math.sin(state.clock.elapsedTime * spd) * amp;
+              tailMesh.rotation.x += Math.sin(state.clock.elapsedTime * (spd * 0.8)) * (amp * 0.4);
+            }
+          }
+
+          const breathScale = 1 + Math.sin(state.clock.elapsedTime * 2) * 0.01;
+          catModel.scale.set(CAT_SCALE * breathScale, CAT_SCALE, CAT_SCALE * breathScale);
+        }
       }
     }
   });
