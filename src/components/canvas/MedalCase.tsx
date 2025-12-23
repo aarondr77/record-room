@@ -77,11 +77,13 @@ export function MedalCase({ position = [0, 0, 0] }: MedalCaseProps) {
     metalness: 0.05,
   }), []);
 
-  // Bright gold for medal
+  // Bright gold for medal - enhanced for shine
   const brightGoldMaterial = useMemo(() => ({
     color: "#FFD700",
-    roughness: 0.3,
-    metalness: 0.7,
+    roughness: 0.15, // Lower roughness = more reflective/shiny
+    metalness: 0.9, // Higher metalness = more metallic shine
+    emissive: "#FFD700", // Slight emissive glow
+    emissiveIntensity: 0.1,
   }), []);
 
   // Ribbon colors (red, white, blue stripes)
@@ -305,6 +307,15 @@ export function MedalCase({ position = [0, 0, 0] }: MedalCaseProps) {
 
       {/* === GOLD MEDAL === */}
       <group position={[0, CASE_HEIGHT / 2 - RIBBON_LENGTH - MEDAL_RADIUS - 0.15, Z_FRONT + CASE_DEPTH + 0.03]}>
+        {/* Subtle point light to illuminate the medal without visible cone */}
+        <pointLight
+          position={[0, 0, 0.2]}
+          intensity={1.2}
+          color="#FFD700"
+          distance={0.5}
+          decay={3}
+        />
+        
         {/* Medal body - flat disc facing forward */}
         <mesh castShadow receiveShadow rotation={[Math.PI / 2, 0, 0]}>
           <cylinderGeometry args={[MEDAL_RADIUS, MEDAL_RADIUS, MEDAL_THICKNESS, 32]} />
