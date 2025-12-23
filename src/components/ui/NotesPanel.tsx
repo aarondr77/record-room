@@ -16,7 +16,6 @@ export function NotesPanel({
   currentUserId,
   isLoading,
   onCreateNote,
-  onDeleteNote,
 }: NotesPanelProps) {
   const handleCreateNote = async (content: string) => {
     await onCreateNote(content, currentUserId);
@@ -43,6 +42,11 @@ export function NotesPanel({
 
   const partnerMap = getPartnerAssignment();
 
+  // Sort notes chronologically by created_at timestamp
+  const sortedNotes = [...notes].sort((a, b) => 
+    new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+
   return (
     <div className="notes-panel">
       <h3 className="notes-title">Notes</h3>
@@ -53,7 +57,7 @@ export function NotesPanel({
         ) : notes.length === 0 ? (
           <p className="no-notes"></p>
         ) : (
-          notes.map((note) => (
+          sortedNotes.map((note) => (
             <NoteCard
               key={note.id}
               note={note}
