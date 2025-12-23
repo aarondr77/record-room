@@ -1,0 +1,33 @@
+.help-icon {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.help-icon:hover {
+  background: rgba(0, 0, 0, 0.9);
+  transform: scale(1.05);
+}
+
+.help-icon:active {
+  transform: scale(0.98);
+}
+
+.help-icon-text {
+  font-size: 20px;
+  font-weight: 600;
+  font-family: monospace;
+}
+

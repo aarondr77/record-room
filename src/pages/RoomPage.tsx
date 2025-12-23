@@ -3,6 +3,8 @@ import { Room } from '../components/canvas/Room';
 import { RecordModal } from '../components/ui/RecordModal';
 import { NowPlayingBar } from '../components/ui/NowPlayingBar';
 import { InteractionPrompt } from '../components/ui/InteractionPrompt';
+import { HelpIcon } from '../components/ui/HelpIcon';
+import { HelpModal } from '../components/ui/HelpModal';
 import { useCatMovement } from '../hooks/useCatMovement';
 import { useNotes } from '../hooks/useNotes';
 import { useSpotifyPlayer } from '../hooks/useSpotifyPlayer';
@@ -47,6 +49,7 @@ export function RoomPage({ tracks, currentUser, accessToken }: RoomPageProps) {
   
   const [selectedTrackIndex, setSelectedTrackIndex] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   
   const selectedTrack = selectedTrackIndex !== null ? tracks[selectedTrackIndex] : null;
   const trackId = selectedTrack?.id || null;
@@ -111,6 +114,8 @@ export function RoomPage({ tracks, currentUser, accessToken }: RoomPageProps) {
 
   return (
     <div className="room-page">
+      <HelpIcon onClick={() => setIsHelpModalOpen(true)} />
+      
       <div className="room-scene-container">
         <Room
           tracks={tracks}
@@ -143,6 +148,11 @@ export function RoomPage({ tracks, currentUser, accessToken }: RoomPageProps) {
         onPlayPause={handlePlayPause}
         onCreateNote={handleCreateNote}
         onDeleteNote={handleDeleteNote}
+      />
+
+      <HelpModal
+        isOpen={isHelpModalOpen}
+        onClose={() => setIsHelpModalOpen(false)}
       />
 
       <NowPlayingBar
