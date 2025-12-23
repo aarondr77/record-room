@@ -11,6 +11,8 @@ import { PlaceholderCat } from './PlaceholderCat';
 import { CameraFollow } from './CameraFollow';
 import { LobsterToy } from './LobsterToy';
 import { ChristmasLights } from './ChristmasLights';
+import { FloorLamp } from './FloorLamp';
+import { ArcLamp } from './ArcLamp';
 import { getAllPlatforms, generatePlatforms, calculateWallWidth } from '../../config/platforms';
 import type { SpotifyTrack, ToyState } from '../../types';
 import type { CatState } from '../../types';
@@ -101,6 +103,12 @@ export function Room({ tracks, catState, toyState, onRecordClick, isZoomed, zoom
       
       {/* Cat */}
       <PlaceholderCat catState={catState} carryingToy={toyState.isCarried} isPlaying={isPlaying} />
+      
+      {/* Floor lamp with warm yellow glow - left side */}
+      <FloorLamp position={[-4, FLOOR_Y, FLOOR_Z + 0.5]} />
+      
+      {/* Funky arc lamp - right side */}
+      <ArcLamp position={[10, FLOOR_Y, FLOOR_Z + 0.5]} />
     </Canvas>
   );
 }
