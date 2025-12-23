@@ -10,6 +10,7 @@ import { MedalCase } from './MedalCase';
 import { PlaceholderCat } from './PlaceholderCat';
 import { CameraFollow } from './CameraFollow';
 import { LobsterToy } from './LobsterToy';
+import { ChristmasLights } from './ChristmasLights';
 import { getAllPlatforms, generatePlatforms, calculateWallWidth } from '../../config/platforms';
 import type { SpotifyTrack, ToyState } from '../../types';
 import type { CatState } from '../../types';
@@ -52,6 +53,9 @@ export function Room({ tracks, catState, toyState, onRecordClick, isZoomed, zoom
       
       {/* Platforms, Shelves, Window, and Medal Case */}
       <Suspense fallback={null}>
+        {/* Christmas string lights along top of platforms */}
+        <ChristmasLights platforms={platforms.filter(p => p.type !== 'floor')} />
+        
         {platforms.map((platform) => {
           // Skip floor platform from shelf/window rendering
           if (platform.type === 'floor') {
