@@ -109,7 +109,7 @@ export function FloorLamp({ position = [-4, FLOOR_Y, FLOOR_Z + 0.5] }: FloorLamp
       {/* Main warm yellow point light */}
       <pointLight
         position={[0, lightY, 0]}
-        color="#FFCC44"
+        color="#f2a02e"
         intensity={3}
         distance={10}
         decay={2}
@@ -124,7 +124,7 @@ export function FloorLamp({ position = [-4, FLOOR_Y, FLOOR_Z + 0.5] }: FloorLamp
       {/* Additional soft fill light for wider warm glow */}
       <pointLight
         position={[0, lightY, 0]}
-        color="#FFB855"
+        color="#f2a02e"
         intensity={3}
         distance={12}
         decay={1.5}

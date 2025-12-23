@@ -29,7 +29,7 @@ export function Lighting() {
         ref={directionalLightRef}
         position={[4, 6, 7]}
         intensity={.8}
-        color="#FFEDDE"
+        color="#debe87"
         castShadow
         shadow-mapSize-width={4096}
         shadow-mapSize-height={4096}
