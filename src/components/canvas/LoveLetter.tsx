@@ -87,6 +87,7 @@ and us.
     metalness: 0.05,
   }), []);
 
+
   return (
     <group position={position}>
       {/* Ornate multi-layer wooden frame */}
@@ -313,7 +314,11 @@ and us.
       {/* Letter paper - positioned forward from frame */}
       <mesh ref={letterRef} castShadow receiveShadow position={[0, 0, Z_FRONT + LETTER_DEPTH / 2]}>
         <boxGeometry args={[LETTER_WIDTH, LETTER_HEIGHT, LETTER_DEPTH]} />
-        <meshStandardMaterial color="#FFF8DC" />
+        <meshStandardMaterial 
+          color="#FFF8DC"
+          roughness={0.95}
+          metalness={0.0}
+        />
       </mesh>
 
       {/* Letter text */}
@@ -321,11 +326,15 @@ and us.
         ref={textRef}
         position={[-LETTER_WIDTH / 2 + PADDING, LETTER_HEIGHT / 2 - PADDING, Z_FRONT + LETTER_DEPTH + 0.01]}
         fontSize={FONT_SIZE}
-        color="#2C1810"
+        color="#3D2817"
         anchorX="left"
         anchorY="top"
         maxWidth={LETTER_WIDTH - (PADDING * 2)}
         textAlign="left"
+        letterSpacing={0.02}
+        lineHeight={1.4}
+        outlineWidth={0.002}
+        outlineColor="#1A0F08"
       >
         {letterText}
       </Text>
@@ -334,11 +343,15 @@ and us.
       <Text
         position={[-LETTER_WIDTH / 2 + PADDING, LETTER_HEIGHT / 2 - PADDING - FONT_SIZE * 7.5, Z_FRONT + LETTER_DEPTH + 0.01]}
         fontSize={FONT_SIZE}
-        color={isHovered ? "#8B4513" : "#2C1810"}
+        color={isHovered ? "#6B3410" : "#3D2817"}
         anchorX="left"
         anchorY="top"
         maxWidth={LETTER_WIDTH - (PADDING * 2)}
         textAlign="left"
+        letterSpacing={0.02}
+        lineHeight={1.4}
+        outlineWidth={0.002}
+        outlineColor="#1A0F08"
         onClick={onEnter}
         onPointerOver={() => {
           setIsHovered(true);

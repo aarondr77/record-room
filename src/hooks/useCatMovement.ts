@@ -1,10 +1,28 @@
-import { useState, useCallback, useEffect } from 'react';
-import { platforms, CAT_START_PLATFORM, CAT_START_RECORD, getPlatform } from '../config/platforms';
+import { useState, useCallback, useEffect, useMemo } from 'react';
+import { generatePlatforms, getPlatform } from '../config/platforms';
 import type { CatState } from '../types';
 
-export function useCatMovement() {
-  const [platform, setPlatform] = useState(CAT_START_PLATFORM);
-  const [recordIndex, setRecordIndex] = useState<number | null>(CAT_START_RECORD);
+interface UseCatMovementOptions {
+  trackCount?: number;
+}
+
+export function useCatMovement(options: UseCatMovementOptions = {}) {
+  const { trackCount = 5 } = options;
+  
+  // Generate platforms and find starting platform
+  const { startPlatformId } = useMemo(() => {
+    const platformMap = generatePlatforms(trackCount);
+    // Find the first shelf in the bottom row (row 1) as starting position
+    const startPlatform = Object.values(platformMap).find(p => 
+      p.type === 'shelf' && p.grid.row === 1
+    );
+    return {
+      startPlatformId: startPlatform?.id ?? Object.values(platformMap).find(p => p.type === 'shelf')?.id ?? 0,
+    };
+  }, [trackCount]);
+  
+  const [platform, setPlatform] = useState(startPlatformId);
+  const [recordIndex, setRecordIndex] = useState<number | null>(0);
   const [facing, setFacing] = useState<'left' | 'right'>('right');
   const [isMoving, setIsMoving] = useState(false);
 

@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import { Suspense, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { PerspectiveCamera } from '@react-three/drei';
 import { Wall } from './Wall';
@@ -7,7 +7,8 @@ import { Lighting } from './Lighting';
 import { Shelf } from './Shelf';
 import { Window } from './Window';
 import { PlaceholderCat } from './PlaceholderCat';
-import { getAllPlatforms } from '../../config/platforms';
+import { CameraFollow } from './CameraFollow';
+import { getAllPlatforms, generatePlatforms, calculateWallWidth } from '../../config/platforms';
 import type { SpotifyTrack } from '../../types';
 import type { CatState } from '../../types';
 
@@ -18,19 +19,30 @@ interface RoomProps {
 }
 
 export function Room({ tracks, catState, onRecordClick }: RoomProps) {
-  const platforms = getAllPlatforms();
+  // Generate platforms dynamically based on track count
+  const platforms = useMemo(() => getAllPlatforms(tracks.length), [tracks.length]);
+  
+  // Calculate wall width based on platform layout
+  const wallSize = useMemo(() => {
+    const platformMap = generatePlatforms(tracks.length);
+    const width = calculateWallWidth(platformMap);
+    return [width, 30] as [number, number];
+  }, [tracks.length]);
 
   return (
     <Canvas shadows>
       <PerspectiveCamera makeDefault position={[0, 0, 8]} fov={60} />
       
+      {/* Camera follows cat */}
+      <CameraFollow catState={catState} />
+      
       <Lighting />
       
-      {/* Wall - extends beyond viewport, no visible edges */}
-      <Wall position={[0, 0, 0]} size={[50, 30]} />
+      {/* Wall - dynamically sized based on platform layout */}
+      <Wall position={[0, 0, 0]} size={wallSize} />
       
-      {/* Floor - detailed wooden planks with realistic grain and variation */}
-      <Floor position={[0, -3, 2]} width={50} depth={10} />
+      {/* Floor - width matches wall width */}
+      <Floor position={[0, -3, 2]} width={wallSize[0]} depth={10} />
       
       {/* Platforms, Shelves, and Window */}
       <Suspense fallback={null}>

@@ -16,7 +16,7 @@ interface RoomPageProps {
 }
 
 export function RoomPage({ tracks, currentUser, accessToken }: RoomPageProps) {
-  const catState = useCatMovement();
+  const catState = useCatMovement({ trackCount: tracks.length });
   const [selectedTrackIndex, setSelectedTrackIndex] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
