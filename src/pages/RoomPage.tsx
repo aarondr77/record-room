@@ -208,6 +208,7 @@ export function RoomPage({ tracks, currentUser, accessToken }: RoomPageProps) {
           onRecordClick={handleRecordClick}
           isZoomed={isMedalZoomed}
           zoomTarget={zoomTarget}
+          isPlaying={isPlaying}
         />
       </div>
 

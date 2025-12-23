@@ -23,9 +23,10 @@ interface RoomProps {
   onRecordClick?: (trackIndex: number) => void;
   isZoomed?: boolean;
   zoomTarget?: { x: number; y: number; z: number };
+  isPlaying?: boolean;
 }
 
-export function Room({ tracks, catState, toyState, onRecordClick, isZoomed, zoomTarget }: RoomProps) {
+export function Room({ tracks, catState, toyState, onRecordClick, isZoomed, zoomTarget, isPlaying = false }: RoomProps) {
   // Generate platforms dynamically based on track count
   const platforms = useMemo(() => getAllPlatforms(tracks.length), [tracks.length]);
   
@@ -99,7 +100,7 @@ export function Room({ tracks, catState, toyState, onRecordClick, isZoomed, zoom
       )}
       
       {/* Cat */}
-      <PlaceholderCat catState={catState} carryingToy={toyState.isCarried} />
+      <PlaceholderCat catState={catState} carryingToy={toyState.isCarried} isPlaying={isPlaying} />
     </Canvas>
   );
 }
