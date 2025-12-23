@@ -13,7 +13,7 @@ export function LoveLetter({ position = [0, 2, 0], onEnter }: LoveLetterProps) {
   const [isHovered, setIsHovered] = useState(false);
 
   const LETTER_DEPTH = 0.05;
-  const PADDING = 0.4; // Padding around text in all directions
+  const PADDING = 0.5; // Padding around text in all directions
   const FONT_SIZE = 0.25;
   
   // Main text without "Come in."
@@ -30,7 +30,7 @@ and us.
   const lineCount = lines.filter(line => line.trim().length > 0).length || lines.length;
   
   const estimatedTextWidth = Math.max(maxLineLength * FONT_SIZE * 0.55, 2.0);
-  const estimatedTextHeight = lineCount * FONT_SIZE * 2;
+  const estimatedTextHeight = lineCount * FONT_SIZE * 2.2;
   
   const LETTER_WIDTH = estimatedTextWidth + (PADDING * 2);
   const LETTER_HEIGHT = estimatedTextHeight + (PADDING * 2);
