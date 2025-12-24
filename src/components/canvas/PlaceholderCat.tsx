@@ -15,7 +15,7 @@ interface PlaceholderCatProps {
 
 // Cat scale - sized to fit on shelf platforms (records are 2x2 units)
 // Cat should be clearly visible - about 0.6-0.8 units tall when sitting
-const CAT_SCALE = 1.0;
+const CAT_SCALE = 1.5;
 const JUMP_DURATION_S = 0.6; // slightly longer to allow body animations to be visible
 const JUMP_MIN_HEIGHT = 0.18;
 const JUMP_MAX_HEIGHT = 0.42;
@@ -349,6 +349,7 @@ function createCatModel(): {
 export function PlaceholderCat({ catState, carryingToy = false, wearingHat = false, isPlaying = false }: PlaceholderCatProps) {
   const catRef = useRef<Group>(null);
   const hatRef = useRef<Group>(null);
+  const toyRef = useRef<Group>(null);
   const { platform, recordIndex, facing, isMoving, floorX } = catState;
 
   const jumpRef = useRef<{
@@ -1015,18 +1016,50 @@ export function PlaceholderCat({ catState, carryingToy = false, wearingHat = fal
         hatRef.current.rotation.copy(headGroup.rotation);
         // Position hat to sit on top of head (not floating)
         // Head center is at (0, 0.42, 0.08) in headGroup's local space
-        // Head radius is ~0.14, so top of head is at y ≈ 0.56
+        // Head radius is ~0.14, scaled by CAT_SCALE, so actual radius is 0.14 * CAT_SCALE
         // Hat should sit lower, with the sweatband fitting around the head
-        const headLocalY = 0.42; // Head center Y in headGroup space
-        const headLocalZ = 0.08; // Head center Z in headGroup space
-        const headRadius = 0.14; // Approximate head radius
+        // Get world position of head center (accounting for catModel scale)
+        const headCenterLocal = new Vector3(0, 0.42, 0.08); // Head center in headGroup local space
+        const headCenterWorld = headCenterLocal.clone();
+        headGroup.localToWorld(headCenterWorld);
+        // Convert to hatRef's local space (hatRef and catModel are siblings under catRef)
+        const headCenterInHatSpace = headCenterWorld.clone();
+        if (catRef.current) {
+          catRef.current.worldToLocal(headCenterInHatSpace);
+        }
+        const headRadius = 0.14 * CAT_SCALE; // Approximate head radius scaled by cat scale
         // Position hat so it sits on the head (sweatband fits around top of head)
-        // Use a smaller offset so hat doesn't float
+        // Scale offsets by CAT_SCALE to match the larger cat
         hatRef.current.position.set(
-          headGroup.position.x,
-          headGroup.position.y + headLocalY + headRadius * 0.6 + 0.1, // Sit on head, not floating
-          headGroup.position.z + headLocalZ - 0.01 // Slightly back so brim extends backward
+          headCenterInHatSpace.x,
+          headCenterInHatSpace.y + headRadius * 0.6 + 0.1 * CAT_SCALE, // Sit on head, not floating
+          headCenterInHatSpace.z - 0.01 * CAT_SCALE // Slightly back so brim extends backward
         );
+      }
+      
+      // === TOY SYNC: Make toy follow the head group's transforms ===
+      if (toyRef.current && carryingToy) {
+        // Get world position of muzzle (where mouth is)
+        // Muzzle is at (0, 0.37, 0.17) in headGroup local space
+        const muzzleLocal = new Vector3(0, 0.37, 0.17); // Muzzle position in headGroup space
+        const muzzleWorld = muzzleLocal.clone();
+        headGroup.localToWorld(muzzleWorld);
+        // Convert to toyRef's local space (toyRef and catModel are siblings under catRef)
+        const muzzleInToySpace = muzzleWorld.clone();
+        if (catRef.current) {
+          catRef.current.worldToLocal(muzzleInToySpace);
+        }
+        // Position toy at muzzle, slightly forward to appear in mouth
+        toyRef.current.position.set(
+          muzzleInToySpace.x,
+          muzzleInToySpace.y,
+          muzzleInToySpace.z + 0.05 * CAT_SCALE // Slightly forward to be in mouth
+        );
+        // Rotate toy to align with head direction
+        toyRef.current.rotation.copy(headGroup.rotation);
+        // Add slight rotation to make it look held in mouth (tilted slightly)
+        toyRef.current.rotation.y += Math.PI / 2; // Rotate 90 degrees to face sideways
+        toyRef.current.rotation.x += 0.2; // Slight tilt
       }
     }
   });
@@ -1035,10 +1068,6 @@ export function PlaceholderCat({ catState, carryingToy = false, wearingHat = fal
   const initialPosition = useMemo(() => {
     return [catPosition.x, catPosition.y, catPosition.z] as [number, number, number];
   }, []); // Only set once on mount
-
-  // Mouth position for carrying toy (relative to cat group, adjusted for scale)
-  // Cat head is at y=0.42, muzzle at z=0.17, so mouth is slightly below and forward
-  const mouthPosition: [number, number, number] = [0, 0.32, 0.25];
 
   return (
     <group ref={catRef} position={initialPosition}>
@@ -1049,7 +1078,7 @@ export function PlaceholderCat({ catState, carryingToy = false, wearingHat = fal
       />
       {/* Render simplified lobster in mouth when carrying */}
       {carryingToy && (
-        <group position={mouthPosition} rotation={[0, Math.PI / 2, 0]} scale={0.22}>
+        <group ref={toyRef} scale={0.22 * CAT_SCALE}>
           {/* Simplified lobster body */}
           <mesh castShadow>
             <sphereGeometry args={[0.4, 8, 6]} />

@@ -40,7 +40,8 @@ function createBaseballHatModel(): Group {
   // Use a full sphere, then position it so only the top half shows (dome effect)
   // This ensures a solid dome with no holes
   const crownGeometry = new SphereGeometry(0.12, 16, 12);
-  crownGeometry.scale(1.0, 0.7, 1.0); // Flatten slightly for cap shape
+  // Make it more oval/elliptical - wider and flatter to fit head snugly
+  crownGeometry.scale(1.15, 0.5, 1.1); // Wider horizontally, flatter vertically for snug fit
   const crown = new Mesh(crownGeometry, hatMainMaterial);
   // Position so the bottom half is below the head (creates dome effect)
   crown.position.set(0, -0.05, 0); // Lower the sphere so top half forms dome
@@ -130,8 +131,8 @@ export function BaseballHat({ position, isWorn = false }: BaseballHatProps) {
 export function WornBaseballHat() {
   const hatModel = useMemo(() => {
     const model = createBaseballHatModel();
-    // Make it comically large - bigger scale for visibility
-    model.scale.set(1.3, 1.3, 1.3);
+    // Scale to match cat size (cat is 1.5x, hat base scale was 1.3, so 1.3 * 1.5 = 1.95)
+    model.scale.set(1.95, 1.95, 1.95);
     return model;
   }, []);
 
