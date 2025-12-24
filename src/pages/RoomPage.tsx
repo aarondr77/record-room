@@ -112,6 +112,7 @@ export function RoomPage({ tracks, currentUser, accessToken }: RoomPageProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [isMedalZoomed, setIsMedalZoomed] = useState(false);
+  const [showInitialPrompt, setShowInitialPrompt] = useState(true);
   
   const selectedTrack = selectedTrackIndex !== null ? tracks[selectedTrackIndex] : null;
   const trackId = selectedTrack?.id || null;
@@ -180,6 +181,28 @@ export function RoomPage({ tracks, currentUser, accessToken }: RoomPageProps) {
       }
     }
   }, [currentTrack, tracks]);
+
+  // Hide initial prompt when user presses any arrow key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (showInitialPrompt && (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        setShowInitialPrompt(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showInitialPrompt]);
+
+  // Auto-hide initial prompt after 8 seconds
+  useEffect(() => {
+    if (showInitialPrompt) {
+      const timer = setTimeout(() => {
+        setShowInitialPrompt(false);
+      }, 15000);
+      return () => clearTimeout(timer);
+    }
+  }, [showInitialPrompt]);
 
   // Handle Space key to open modal or zoom medal
   useEffect(() => {
@@ -291,6 +314,12 @@ export function RoomPage({ tracks, currentUser, accessToken }: RoomPageProps) {
       </div>
 
       <div className="interaction-prompts-container">
+        <InteractionPrompt
+          message="to move the cat around the room"
+          visible={showInitialPrompt && !isModalOpen && !isMedalZoomed}
+          keyLabel="Arrow Keys"
+        />
+        
         <InteractionPrompt
           message="to open record"
           visible={showPrompt}

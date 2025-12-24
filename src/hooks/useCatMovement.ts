@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { generatePlatforms, getPlatform, findClosestBottomShelf, FLOOR_BOUNDS } from '../config/platforms';
+import { getPlatform, findClosestBottomShelf, FLOOR_BOUNDS } from '../config/platforms';
 import type { CatState, ToyState, HatState, LampState } from '../types';
-import { FLOOR_Y, FLOOR_Z } from '../types';
+import { FLOOR_Y, FLOOR_Z, FLOOR_PLATFORM_ID } from '../types';
 
 interface UseCatMovementOptions {
   trackCount?: number;
@@ -26,19 +26,15 @@ export function useCatMovement(options: UseCatMovementOptions = {}) {
   
   // Generate platforms and find starting platform
   const { startPlatformId, startFloorX } = useMemo(() => {
-    const platformMap = generatePlatforms(trackCount);
-    // Find the first shelf in the bottom row (row 1) as starting position
-    const startPlatform = Object.values(platformMap).find(p => 
-      p.type === 'shelf' && p.grid.row === 1
-    );
+    // Start on the floor platform
     return {
-      startPlatformId: startPlatform?.id ?? Object.values(platformMap).find(p => p.type === 'shelf')?.id ?? 0,
-      startFloorX: startPlatform?.position.x ?? 0,
+      startPlatformId: FLOOR_PLATFORM_ID,
+      startFloorX: 0, // Center of floor bounds
     };
-  }, [trackCount]);
+  }, []);
   
   const [platform, setPlatform] = useState(startPlatformId);
-  const [recordIndex, setRecordIndex] = useState<number | null>(0);
+  const [recordIndex, setRecordIndex] = useState<number | null>(null);
   const [facing, setFacing] = useState<'left' | 'right'>('right');
   const [isMoving, setIsMoving] = useState(false);
   const [floorX, setFloorX] = useState(startFloorX); // X position when on floor

@@ -35,9 +35,10 @@ export function HelpModal({ isOpen, onClose }: HelpModalProps) {
         <h2 className="help-modal-title">How to Play</h2>
         
         <ol className="help-modal-instructions">
+          <li>Use the <span className="help-key">Arrow Keys</span> to move the cat around</li>
           <li>Move the cat to a platform then press <span className="help-key">Space</span> to open the record and see the notes</li>
           <li>Leave your own note.</li>
-          <li>Go to a toy and press <span className="help-key">Space</span> to pick it up</li>
+          <li>Go to a toy and press <span className="help-key">G</span> to pick it up</li>
           <li>Press <span className="help-key">D</span> to drop the toy</li>
         </ol>
       </div>
