@@ -10,15 +10,9 @@
 4. This could keep evolving, I can start with a garden, then add a house and a whole new world for us to explore and share together.
 
 
-# Features to add
-1. When one song finishes, play the next one instead of repeating the same song! 
-
 # Trinkets to add
-1. Lobster toy
-2. Cat doing a pullup
 3. Cat laying on person's leg
 4. Eating salt 
-5. Trophy case on the wall with framed gold medal
 
 
 
