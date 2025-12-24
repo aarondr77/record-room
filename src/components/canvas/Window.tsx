@@ -8,14 +8,14 @@ interface WindowProps {
   hasPlatform?: boolean;
 }
 
-// Generate a sky texture with gradient - vibrant blue
+// Generate a sky texture with gradient - wintery gray/white
 function createSkyTexture(width: number, height: number): DataTexture {
   const size = width * height;
   const data = new Uint8Array(size * 4);
   
-  // Sky gradient colors - vivid blue at top, light blue toward horizon
-  const topColor = { r: 100, g: 170, b: 255 };    // Vivid sky blue
-  const bottomColor = { r: 180, g: 220, b: 255 }; // Light blue near horizon
+  // Sky gradient colors - dark gray at top, lighter gray toward horizon (wintery)
+  const topColor = { r: 120, g: 130, b: 140 };    // Dark gray
+  const bottomColor = { r: 180, g: 190, b: 200 }; // Light gray near horizon
   
   for (let i = 0; i < size; i++) {
     const y = Math.floor(i / width) / height;
@@ -41,53 +41,60 @@ function createSkyTexture(width: number, height: number): DataTexture {
   return texture;
 }
 
-// Cloud component that floats by - constrained within bounds
-function Cloud({ initialPosition, speed, scale, bounds }: { 
+// Snowflake component that falls down - constrained within bounds
+function Snowflake({ initialPosition, speed, scale, bounds }: { 
   initialPosition: [number, number, number]; 
   speed: number;
   scale: number;
-  bounds: { minX: number; maxX: number };
+  bounds: { minX: number; maxX: number; minY: number; maxY: number };
 }) {
-  const cloudRef = useRef<Group>(null);
+  const snowflakeRef = useRef<Group>(null);
+  const startY = initialPosition[1];
   const startX = initialPosition[0];
-  const range = bounds.maxX - bounds.minX;
+  const rangeY = bounds.maxY - bounds.minY;
+  const rangeX = bounds.maxX - bounds.minX;
   
   useFrame((state) => {
-    if (cloudRef.current) {
-      // Move cloud slowly to the right, wrap around within bounds
+    if (snowflakeRef.current) {
+      // Move snowflake down, wrap around when it goes below bounds
       const time = state.clock.elapsedTime * speed;
-      // Wrap within the bounds
-      const normalizedX = ((startX - bounds.minX + time) % range);
-      const x = bounds.minX + normalizedX;
-      cloudRef.current.position.x = x;
+      // Wrap Y within the bounds (falling down, reset at top)
+      // Start at top (maxY), fall down (decrease Y), wrap to top when below minY
+      const fallDistance = time;
+      const normalizedY = ((startY - bounds.minY - fallDistance) % rangeY);
+      const y = bounds.minY + (normalizedY < 0 ? normalizedY + rangeY : normalizedY);
+      snowflakeRef.current.position.y = y;
+      
+      // Slight horizontal drift (wind effect) - keep within bounds
+      const drift = Math.sin(time * 0.5) * 0.05;
+      const normalizedX = ((startX - bounds.minX + drift) % rangeX);
+      const x = bounds.minX + (normalizedX < 0 ? normalizedX + rangeX : normalizedX);
+      snowflakeRef.current.position.x = x;
+      
+      // Gentle rotation as it falls
+      snowflakeRef.current.rotation.z = time * 0.5;
     }
   });
   
   return (
-    <group ref={cloudRef} position={initialPosition}>
-      {/* Fluffy cloud made of flattened spheres (scaled z to 0.1 so they don't extend forward) */}
+    <group ref={snowflakeRef} position={initialPosition}>
+      {/* Simple snowflake - small white cross shape */}
+      {/* Main cross */}
       <mesh position={[0, 0, 0]} scale={[scale, scale, scale * 0.1]} renderOrder={1}>
-        <sphereGeometry args={[0.15, 8, 8]} />
+        <boxGeometry args={[0.02 * scale, 0.08 * scale, 0.01]} />
         <meshBasicMaterial color="#ffffff" depthWrite={true} />
       </mesh>
-      <mesh position={[0.12, 0.03, 0]} scale={[scale * 0.9, scale * 0.9, scale * 0.1]} renderOrder={1}>
-        <sphereGeometry args={[0.12, 8, 8]} />
+      <mesh position={[0, 0, 0]} rotation={[0, 0, Math.PI / 2]} scale={[scale, scale, scale * 0.1]} renderOrder={1}>
+        <boxGeometry args={[0.02 * scale, 0.08 * scale, 0.01]} />
         <meshBasicMaterial color="#ffffff" depthWrite={true} />
       </mesh>
-      <mesh position={[-0.1, 0.02, 0]} scale={[scale * 0.85, scale * 0.85, scale * 0.1]} renderOrder={1}>
-        <sphereGeometry args={[0.11, 8, 8]} />
+      {/* Diagonal arms */}
+      <mesh position={[0, 0, 0]} rotation={[0, 0, Math.PI / 4]} scale={[scale, scale, scale * 0.1]} renderOrder={1}>
+        <boxGeometry args={[0.015 * scale, 0.06 * scale, 0.01]} />
         <meshBasicMaterial color="#ffffff" depthWrite={true} />
       </mesh>
-      <mesh position={[0.06, -0.04, 0]} scale={[scale * 0.75, scale * 0.75, scale * 0.1]} renderOrder={1}>
-        <sphereGeometry args={[0.1, 8, 8]} />
-        <meshBasicMaterial color="#ffffff" depthWrite={true} />
-      </mesh>
-      <mesh position={[-0.06, -0.03, 0]} scale={[scale * 0.7, scale * 0.7, scale * 0.1]} renderOrder={1}>
-        <sphereGeometry args={[0.09, 8, 8]} />
-        <meshBasicMaterial color="#ffffff" depthWrite={true} />
-      </mesh>
-      <mesh position={[0.18, 0, 0]} scale={[scale * 0.65, scale * 0.65, scale * 0.1]} renderOrder={1}>
-        <sphereGeometry args={[0.08, 8, 8]} />
+      <mesh position={[0, 0, 0]} rotation={[0, 0, -Math.PI / 4]} scale={[scale, scale, scale * 0.1]} renderOrder={1}>
+        <boxGeometry args={[0.015 * scale, 0.06 * scale, 0.01]} />
         <meshBasicMaterial color="#ffffff" depthWrite={true} />
       </mesh>
     </group>
@@ -104,8 +111,15 @@ export function Window({ position, hasPlatform = true }: WindowProps) {
   // Create sky texture
   const skyTexture = useMemo(() => createSkyTexture(256, 256), []);
   
-  // Cloud bounds - keep clouds within the window opening
-  const cloudBounds = { minX: -OPENING_SIZE / 2 + 0.15, maxX: OPENING_SIZE / 2 - 0.15 };
+  // Snowflake bounds - keep snowflakes within the window opening
+  // Add padding to keep snowflakes visible within the frame
+  const PADDING = 0.15;
+  const snowflakeBounds = { 
+    minX: -OPENING_SIZE / 2 + PADDING, 
+    maxX: OPENING_SIZE / 2 - PADDING,
+    minY: -OPENING_SIZE / 2 + PADDING,  // Bottom of window opening
+    maxY: OPENING_SIZE / 2 - PADDING    // Top of window opening
+  };
 
   // Z positions - window is at z=0.1, wall is at z=0
   // To be visible, sky must have absolute z > 0
@@ -132,25 +146,91 @@ export function Window({ position, hasPlatform = true }: WindowProps) {
         <meshBasicMaterial map={skyTexture} />
       </mesh>
       
-      {/* Animated clouds - behind mullions */}
+      {/* Animated snowflakes - falling down behind mullions */}
       <group position={[0, 0, Z_CLOUDS]} renderOrder={1}>
-        <Cloud 
-          initialPosition={[-0.2, 0.3, 0]} 
-          speed={0.06} 
-          scale={1.2} 
-          bounds={cloudBounds}
+        <Snowflake 
+          initialPosition={[-0.3, 0.6, 0]} 
+          speed={0.15} 
+          scale={0.8} 
+          bounds={snowflakeBounds}
         />
-        <Cloud 
-          initialPosition={[0.4, 0.0, 0]} 
-          speed={0.045} 
+        <Snowflake 
+          initialPosition={[0.2, 0.7, 0]} 
+          speed={0.12} 
           scale={1.0} 
-          bounds={cloudBounds}
+          bounds={snowflakeBounds}
         />
-        <Cloud 
-          initialPosition={[-0.5, -0.25, 0]} 
-          speed={0.055} 
+        <Snowflake 
+          initialPosition={[-0.1, 0.8, 0]} 
+          speed={0.18} 
+          scale={0.7} 
+          bounds={snowflakeBounds}
+        />
+        <Snowflake 
+          initialPosition={[0.4, 0.5, 0]} 
+          speed={0.14} 
           scale={0.9} 
-          bounds={cloudBounds}
+          bounds={snowflakeBounds}
+        />
+        <Snowflake 
+          initialPosition={[-0.5, 0.9, 0]} 
+          speed={0.16} 
+          scale={0.75} 
+          bounds={snowflakeBounds}
+        />
+        <Snowflake 
+          initialPosition={[0.1, 0.65, 0]} 
+          speed={0.13} 
+          scale={0.85} 
+          bounds={snowflakeBounds}
+        />
+        <Snowflake 
+          initialPosition={[-0.4, 0.55, 0]} 
+          speed={0.17} 
+          scale={0.95} 
+          bounds={snowflakeBounds}
+        />
+        <Snowflake 
+          initialPosition={[0.3, 0.75, 0]} 
+          speed={0.11} 
+          scale={0.8} 
+          bounds={snowflakeBounds}
+        />
+        <Snowflake 
+          initialPosition={[-0.2, 0.85, 0]} 
+          speed={0.19} 
+          scale={0.65} 
+          bounds={snowflakeBounds}
+        />
+        <Snowflake 
+          initialPosition={[0.5, 0.6, 0]} 
+          speed={0.10} 
+          scale={1.1} 
+          bounds={snowflakeBounds}
+        />
+        <Snowflake 
+          initialPosition={[-0.25, 0.5, 0]} 
+          speed={0.20} 
+          scale={0.6} 
+          bounds={snowflakeBounds}
+        />
+        <Snowflake 
+          initialPosition={[0.15, 0.9, 0]} 
+          speed={0.09} 
+          scale={0.9} 
+          bounds={snowflakeBounds}
+        />
+        <Snowflake 
+          initialPosition={[-0.35, 0.7, 0]} 
+          speed={0.21} 
+          scale={0.7} 
+          bounds={snowflakeBounds}
+        />
+        <Snowflake 
+          initialPosition={[0.45, 0.8, 0]} 
+          speed={0.22} 
+          scale={0.75} 
+          bounds={snowflakeBounds}
         />
       </group>
       
