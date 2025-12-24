@@ -9,7 +9,7 @@ import { useCatMovement } from '../hooks/useCatMovement';
 import { useNotes } from '../hooks/useNotes';
 import { useSpotifyPlayer } from '../hooks/useSpotifyPlayer';
 import { getMedalPlatform, getPlatform } from '../config/platforms';
-import type { SpotifyTrack, SpotifyUser, ToyState, HatState } from '../types';
+import type { SpotifyTrack, SpotifyUser, ToyState, HatState, LampState } from '../types';
 import { FLOOR_Y, FLOOR_Z } from '../types';
 import './RoomPage.css';
 
@@ -39,6 +39,12 @@ export function RoomPage({ tracks, currentUser, accessToken }: RoomPageProps) {
     isWorn: false,
   });
 
+  // Lamp state management (lamp is on a shelf at position [4, -1.4, 0.8])
+  const [lampState, setLampState] = useState<LampState>({
+    position: { x: 4, y: -1.4, z: 0.8 },
+    isWorn: false,
+  });
+
   // Handlers for toy pickup and drop
   const handlePickupToy = useCallback(() => {
     setToyState(prev => ({ ...prev, isCarried: true }));
@@ -63,15 +69,40 @@ export function RoomPage({ tracks, currentUser, accessToken }: RoomPageProps) {
     });
   }, []);
 
+  // Handlers for lamp pickup and drop
+  const handlePickupLamp = useCallback(() => {
+    setLampState(prev => ({ ...prev, isWorn: true }));
+  }, []);
+
+  // Use ref to track platform for drop handler
+  const platformRef = useRef<number>(0);
+  
+  const handleDropLamp = useCallback((x: number, z: number) => {
+    const currentPlatform = getPlatform(platformRef.current);
+    const dropY = currentPlatform?.type === 'shelf' ? currentPlatform.position.y - 1 : FLOOR_Y;
+    setLampState({
+      position: { x, y: dropY, z },
+      isWorn: false,
+    });
+  }, []);
+
   const catState = useCatMovement({ 
     trackCount: tracks.length,
     toyState,
     hatState,
+    lampState,
     onPickupToy: handlePickupToy,
     onDropToy: handleDropToy,
     onPickupHat: handlePickupHat,
     onDropHat: handleDropHat,
+    onPickupLamp: handlePickupLamp,
+    onDropLamp: handleDropLamp,
   });
+
+  // Update platform ref when catState changes
+  useEffect(() => {
+    platformRef.current = catState.platform;
+  }, [catState.platform]);
   
   const [selectedTrackIndex, setSelectedTrackIndex] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -213,6 +244,9 @@ export function RoomPage({ tracks, currentUser, accessToken }: RoomPageProps) {
   // Show hat prompt when near hat on floor and not wearing
   const showHatPrompt = catState.isNearHat && !hatState.isWorn && !isModalOpen && !isMedalZoomed;
   
+  // Show lamp prompt when near lamp on shelf and not wearing
+  const showLampPrompt = catState.isNearLamp && !lampState.isWorn && !isModalOpen && !isMedalZoomed;
+  
   // Show medal prompt when near medal (not zoomed in yet)
   const showMedalPrompt = isNearMedal && !isMedalZoomed && !isModalOpen;
   
@@ -233,6 +267,7 @@ export function RoomPage({ tracks, currentUser, accessToken }: RoomPageProps) {
           catState={catState}
           toyState={toyState}
           hatState={hatState}
+          lampState={lampState}
           onRecordClick={handleRecordClick}
           isZoomed={isMedalZoomed}
           zoomTarget={zoomTarget}
@@ -240,35 +275,49 @@ export function RoomPage({ tracks, currentUser, accessToken }: RoomPageProps) {
         />
       </div>
 
-      <InteractionPrompt
-        message="to open record"
-        visible={showPrompt}
-      />
-      
-      <InteractionPrompt
-        message="to pick up toy"
-        visible={showToyPrompt}
-      />
-      
-      <InteractionPrompt
-        message="to put on hat"
-        visible={showHatPrompt}
-      />
-      
-      <InteractionPrompt
-        message="to view medal"
-        visible={showMedalPrompt}
-      />
-      
-      <InteractionPrompt
-        message="to exit"
-        visible={showMedalExitPrompt}
-      />
-      
-      <InteractionPrompt
-        message="to do pullup on window"
-        visible={showWindowPullupPrompt}
-      />
+      <div className="interaction-prompts-container">
+        <InteractionPrompt
+          message="to open record"
+          visible={showPrompt}
+          keyLabel="Space"
+        />
+        
+        <InteractionPrompt
+          message="to pick up toy"
+          visible={showToyPrompt}
+          keyLabel="G"
+        />
+        
+        <InteractionPrompt
+          message="to put on hat"
+          visible={showHatPrompt}
+          keyLabel="G"
+        />
+        
+        <InteractionPrompt
+          message="to put on lamp"
+          visible={showLampPrompt}
+          keyLabel="G"
+        />
+        
+        <InteractionPrompt
+          message="to view medal"
+          visible={showMedalPrompt}
+          keyLabel="Space"
+        />
+        
+        <InteractionPrompt
+          message="to exit"
+          visible={showMedalExitPrompt}
+          keyLabel="Space"
+        />
+        
+        <InteractionPrompt
+          message="to do pullup on window"
+          visible={showWindowPullupPrompt}
+          keyLabel="Space"
+        />
+      </div>
 
       <RecordModal
         track={selectedTrack}

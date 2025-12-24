@@ -17,7 +17,7 @@ import { ArcLamp } from './ArcLamp';
 import { ShelfLamp } from './ShelfLamp';
 import { PothosPlant } from './PothosPlant';
 import { getAllPlatforms, generatePlatforms, calculateWallWidth } from '../../config/platforms';
-import type { SpotifyTrack, ToyState, HatState } from '../../types';
+import type { SpotifyTrack, ToyState, HatState, LampState } from '../../types';
 import type { CatState } from '../../types';
 import { FLOOR_Y, FLOOR_Z } from '../../types';
 
@@ -26,13 +26,14 @@ interface RoomProps {
   catState: CatState & { currentTrackIndex: number | null };
   toyState: ToyState;
   hatState: HatState;
+  lampState: LampState;
   onRecordClick?: (trackIndex: number) => void;
   isZoomed?: boolean;
   zoomTarget?: { x: number; y: number; z: number };
   isPlaying?: boolean;
 }
 
-export function Room({ tracks, catState, toyState, hatState, onRecordClick, isZoomed, zoomTarget, isPlaying = false }: RoomProps) {
+export function Room({ tracks, catState, toyState, hatState, lampState, onRecordClick, isZoomed, zoomTarget, isPlaying = false }: RoomProps) {
   // Generate platforms dynamically based on track count
   const platforms = useMemo(() => getAllPlatforms(tracks.length), [tracks.length]);
   
@@ -118,6 +119,7 @@ export function Room({ tracks, catState, toyState, hatState, onRecordClick, isZo
         catState={catState} 
         carryingToy={toyState.isCarried} 
         wearingHat={hatState.isWorn}
+        wearingLamp={lampState.isWorn}
         isPlaying={isPlaying} 
       />
       
@@ -127,8 +129,10 @@ export function Room({ tracks, catState, toyState, hatState, onRecordClick, isZo
       {/* Funky arc lamp - right side */}
       <ArcLamp position={[10, FLOOR_Y, FLOOR_Z + 0.5]} />
       
-      {/* Small shelf lamp */}
-      <ShelfLamp position={[4, -1.4, 0.8]} lampPostColor="#1e4005" lightColor="#ba5d9d" />
+      {/* Small shelf lamp - only show when not being worn */}
+      {!lampState.isWorn && (
+        <ShelfLamp position={[lampState.position.x, lampState.position.y, lampState.position.z]} lampPostColor="#1e4005" lightColor="#ba5d9d" />
+      )}
       
       {/* Pothos plant on top shelf (row 0, col 0) with vines trailing down to bottom shelf */}
       {/* Top shelf y ≈ 2.1 (record center), shelf surface ≈ 1.1, vine hangs ~2.5 units to reach row 1 */}

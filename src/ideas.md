@@ -30,3 +30,8 @@ We could do the following for our vibe-coding mode:
 3. In agent mode, you get a split view of the chat taskpane and the rendered outputs. That is all. 
 4. When you click on a chat taskpane code cell, it takes you to the code (swapping out the output only view)
 5. When you right click on something in the output only notebook, it takes you to that same location in the IDE.
+
+
+
+# Vibe Coding Lessions
+1. At this point I have no idea how the code works for the most part. Its becoming harder for me to prompt the agent. My prompts are becoming more and more vague because I can't point to specific parts of the codebase. But its honestly not so bad. 

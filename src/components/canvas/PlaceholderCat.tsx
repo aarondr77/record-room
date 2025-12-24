@@ -5,11 +5,13 @@ import { getPlatform } from '../../config/platforms';
 import type { CatState } from '../../types';
 import { FLOOR_Y, FLOOR_Z } from '../../types';
 import { WornBaseballHat } from './BaseballHat';
+import { WornShelfLamp } from './ShelfLamp';
 
 interface PlaceholderCatProps {
   catState: CatState & { currentTrackIndex: number | null };
   carryingToy?: boolean;
   wearingHat?: boolean;
+  wearingLamp?: boolean;
   isPlaying?: boolean;
 }
 
@@ -346,9 +348,10 @@ function createCatModel(): {
   };
 }
 
-export function PlaceholderCat({ catState, carryingToy = false, wearingHat = false, isPlaying = false }: PlaceholderCatProps) {
+export function PlaceholderCat({ catState, carryingToy = false, wearingHat = false, wearingLamp = false, isPlaying = false }: PlaceholderCatProps) {
   const catRef = useRef<Group>(null);
   const hatRef = useRef<Group>(null);
+  const lampRef = useRef<Group>(null);
   const toyRef = useRef<Group>(null);
   const { platform, recordIndex, facing, isMoving, floorX } = catState;
 
@@ -1037,6 +1040,29 @@ export function PlaceholderCat({ catState, carryingToy = false, wearingHat = fal
         );
       }
       
+      // === LAMP SYNC: Make lamp follow the head group's transforms ===
+      if (lampRef.current && wearingLamp) {
+        // Sync lamp rotation with head group (so lamp tilts with head)
+        lampRef.current.rotation.copy(headGroup.rotation);
+        // Position lamp on top of head, above the hat if both are worn
+        const headCenterLocal = new Vector3(0, 0.42, 0.08); // Head center in headGroup local space
+        const headCenterWorld = headCenterLocal.clone();
+        headGroup.localToWorld(headCenterWorld);
+        // Convert to lampRef's local space (lampRef and catModel are siblings under catRef)
+        const headCenterInLampSpace = headCenterWorld.clone();
+        if (catRef.current) {
+          catRef.current.worldToLocal(headCenterInLampSpace);
+        }
+        const headRadius = 0.14 * CAT_SCALE; // Approximate head radius scaled by cat scale
+        // Position lamp on top of head, above the hat if both are worn
+        const lampHeightOffset = wearingHat ? 0.2 * CAT_SCALE : 0.05 * CAT_SCALE; // Lower offset to sit on head
+        lampRef.current.position.set(
+          headCenterInLampSpace.x,
+          headCenterInLampSpace.y + headRadius * 0.6 + lampHeightOffset, // Sit on head, not floating
+          headCenterInLampSpace.z + 0.05 * CAT_SCALE // Slightly forward
+        );
+      }
+      
       // === TOY SYNC: Make toy follow the head group's transforms ===
       if (toyRef.current && carryingToy) {
         // Get world position of muzzle (where mouth is)
@@ -1106,6 +1132,13 @@ export function PlaceholderCat({ catState, carryingToy = false, wearingHat = fal
       {wearingHat && (
         <group ref={hatRef}>
           <WornBaseballHat />
+        </group>
+      )}
+      {/* Render shelf lamp on head when wearing */}
+      {/* Lamp ref is synced with headGroup transforms in useFrame */}
+      {wearingLamp && (
+        <group ref={lampRef}>
+          <WornShelfLamp />
         </group>
       )}
     </group>

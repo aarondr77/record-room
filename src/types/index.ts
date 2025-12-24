@@ -63,6 +63,7 @@ export interface CatState {
   floorX: number; // X position when on floor (continuous, not discrete)
   carryingToy: boolean;
   wearingHat: boolean;
+  wearingLamp: boolean;
 }
 
 // Toy state for lobster toy
@@ -73,6 +74,12 @@ export interface ToyState {
 
 // Hat state for baseball hat
 export interface HatState {
+  position: { x: number; y: number; z: number };
+  isWorn: boolean;
+}
+
+// Lamp state for shelf lamp
+export interface LampState {
   position: { x: number; y: number; z: number };
   isWorn: boolean;
 }

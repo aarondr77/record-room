@@ -1,25 +1,28 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { generatePlatforms, getPlatform, findClosestBottomShelf, FLOOR_BOUNDS } from '../config/platforms';
-import type { CatState, ToyState, HatState } from '../types';
-import { FLOOR_Z } from '../types';
+import type { CatState, ToyState, HatState, LampState } from '../types';
+import { FLOOR_Y, FLOOR_Z } from '../types';
 
 interface UseCatMovementOptions {
   trackCount?: number;
   toyState?: ToyState;
   hatState?: HatState;
+  lampState?: LampState;
   onPickupToy?: () => void;
   onDropToy?: (x: number, z: number) => void;
   onPickupHat?: () => void;
   onDropHat?: (x: number, z: number) => void;
+  onPickupLamp?: () => void;
+  onDropLamp?: (x: number, z: number) => void;
 }
 
 // Proximity threshold for toy pickup
-const PICKUP_DISTANCE = 0.5;
+const PICKUP_DISTANCE = 1;
 // Floor movement speed (units per frame at 60fps)
-const FLOOR_MOVE_SPEED = 0.08;
+const FLOOR_MOVE_SPEED = 0.15;
 
 export function useCatMovement(options: UseCatMovementOptions = {}) {
-  const { trackCount = 5, toyState, hatState, onPickupToy, onDropToy, onPickupHat, onDropHat } = options;
+  const { trackCount = 5, toyState, hatState, lampState, onPickupToy, onDropToy, onPickupHat, onDropHat, onPickupLamp, onDropLamp } = options;
   
   // Generate platforms and find starting platform
   const { startPlatformId, startFloorX } = useMemo(() => {
@@ -41,6 +44,7 @@ export function useCatMovement(options: UseCatMovementOptions = {}) {
   const [floorX, setFloorX] = useState(startFloorX); // X position when on floor
   const [carryingToy, setCarryingToy] = useState(false);
   const [wearingHat, setWearingHat] = useState(false);
+  const [wearingLamp, setWearingLamp] = useState(false);
   const [startPullup, setStartPullup] = useState(false); // Trigger for window pullup animation
   
   // Track which keys are currently pressed for continuous floor movement
@@ -76,6 +80,17 @@ export function useCatMovement(options: UseCatMovementOptions = {}) {
     }
   }, [isMoving, startMove]);
 
+  // Helper function to check if cat and object are near each other
+  const areObjectsNear = useCallback((
+    catPos: { x: number; y: number; z: number },
+    objectPos: { x: number; y: number; z: number }
+  ): boolean => {
+    const dx = catPos.x - objectPos.x;
+    const dy = catPos.y - objectPos.y;
+    const dz = catPos.z - objectPos.z;
+    return Math.abs(dx) < PICKUP_DISTANCE && Math.abs(dy) < PICKUP_DISTANCE && Math.abs(dz) < PICKUP_DISTANCE;
+  }, []);
+
   // Check if cat is near the toy (for pickup)
   const isNearToy = useCallback(() => {
     if (!toyState || toyState.isCarried || carryingToy) return false;
@@ -83,28 +98,50 @@ export function useCatMovement(options: UseCatMovementOptions = {}) {
     const currentPlatform = getPlatform(platform);
     if (!currentPlatform || currentPlatform.type !== 'floor') return false;
     
-    // Calculate distance on floor
-    const dx = floorX - toyState.position.x;
-    const dz = FLOOR_Z - toyState.position.z;
-    const distance = Math.sqrt(dx * dx + dz * dz);
-    
-    return distance < PICKUP_DISTANCE;
-  }, [toyState, carryingToy, platform, floorX]);
+    const catPos = { x: floorX, y: FLOOR_Y + 0.15, z: FLOOR_Z + 0.3 };
+    return areObjectsNear(catPos, toyState.position);
+  }, [toyState, carryingToy, platform, floorX, areObjectsNear]);
 
   // Check if cat is near the hat (for putting on)
   const isNearHat = useCallback(() => {
     if (!hatState || hatState.isWorn || wearingHat) return false;
     
+    const catPos = { x: floorX, y: FLOOR_Y + 0.15, z: FLOOR_Z + 0.3 };
+    return areObjectsNear(catPos, hatState.position);
+  }, [hatState, wearingHat, platform, floorX, areObjectsNear]);
+
+  // Check if cat is near the lamp (for putting on head)
+  const isNearLamp = useCallback(() => {
+    if (!lampState || lampState.isWorn || wearingLamp) return false;
+    
     const currentPlatform = getPlatform(platform);
-    if (!currentPlatform || currentPlatform.type !== 'floor') return false;
+    if (!currentPlatform) return false;
     
-    // Calculate distance on floor
-    const dx = floorX - hatState.position.x;
-    const dz = FLOOR_Z - hatState.position.z;
-    const distance = Math.sqrt(dx * dx + dz * dz);
+    // Calculate cat position (lamp can be on floor or shelf)
+    let catX: number, catY: number, catZ: number;
     
-    return distance < PICKUP_DISTANCE;
-  }, [hatState, wearingHat, platform, floorX]);
+    if (currentPlatform.type === 'floor') {
+      catX = floorX;
+      catY = FLOOR_Y + 0.15;
+      catZ = FLOOR_Z + 0.3;
+    } else {
+      // Shelf or other platform types
+      catX = currentPlatform.position.x;
+      if (currentPlatform.type === 'shelf' && recordIndex !== null && recordIndex < currentPlatform.records.length) {
+        const recordCount = currentPlatform.records.length;
+        const RECORD_SPACING = 2.2;
+        const totalWidth = (recordCount - 1) * RECORD_SPACING;
+        const startOffset = -totalWidth / 2;
+        catX = currentPlatform.position.x + startOffset + recordIndex * RECORD_SPACING;
+      }
+      catY = currentPlatform.position.y - 1.1 + 0.15;
+      catZ = currentPlatform.position.z + 0.6;
+    }
+    
+    const catPos = { x: catX, y: catY, z: catZ };
+    return areObjectsNear(catPos, lampState.position);
+  }, [lampState, wearingLamp, platform, recordIndex, floorX, areObjectsNear]);
+
 
   // Pickup toy handler
   const pickupToy = useCallback(() => {
@@ -137,6 +174,28 @@ export function useCatMovement(options: UseCatMovementOptions = {}) {
       onDropHat(floorX, FLOOR_Z);
     }
   }, [wearingHat, floorX, onDropHat]);
+
+  // Put on lamp handler
+  const pickupLamp = useCallback(() => {
+    if (isNearLamp() && onPickupLamp) {
+      setWearingLamp(true);
+      onPickupLamp();
+    }
+  }, [isNearLamp, onPickupLamp]);
+
+  // Take off lamp handler
+  const dropLamp = useCallback(() => {
+    if (wearingLamp && onDropLamp) {
+      const currentPlatform = getPlatform(platform);
+      if (currentPlatform && currentPlatform.type === 'shelf') {
+        setWearingLamp(false);
+        onDropLamp(currentPlatform.position.x, currentPlatform.position.z);
+      } else if (currentPlatform && currentPlatform.type === 'floor') {
+        setWearingLamp(false);
+        onDropLamp(floorX, FLOOR_Z);
+      }
+    }
+  }, [wearingLamp, platform, floorX, onDropLamp]);
 
   // Floor movement animation loop
   useEffect(() => {
@@ -213,17 +272,23 @@ export function useCatMovement(options: UseCatMovementOptions = {}) {
 
         case 'd':
         case 'D':
-          // Drop toy or take off hat
+          // Drop toy, take off hat, or take off lamp
           dropToy();
           dropHat();
+          dropLamp();
           break;
 
         case 'Enter':
         case ' ':
-          // Pick up toy or put on hat
+          break;
+          
+        case 'g':
+        case 'G':
+          // Pick up toy or put on lamp
           e.preventDefault();
-          pickupToy();
           pickupHat();
+          pickupToy();
+          pickupLamp();
           break;
       }
       return;
@@ -269,9 +334,19 @@ export function useCatMovement(options: UseCatMovementOptions = {}) {
 
       case 'd':
       case 'D':
-        // Drop toy or take off hat (works on any platform)
+        // Drop toy, take off hat, or take off lamp (works on any platform)
         dropToy();
         dropHat();
+        dropLamp();
+        break;
+
+      case 'g':
+      case 'G':
+        // Pick up toy or put on lamp (works on shelves)
+        e.preventDefault();
+        pickupHat();
+        pickupToy();
+        pickupLamp();
         break;
 
       case 'Enter':
@@ -286,7 +361,7 @@ export function useCatMovement(options: UseCatMovementOptions = {}) {
         // Note: Floor interactions and record interactions are handled elsewhere
         break;
     }
-  }, [platform, recordIndex, isMoving, jumpToPlatform, startMove, floorX, dropToy, pickupToy, dropHat, pickupHat]);
+  }, [platform, recordIndex, isMoving, jumpToPlatform, startMove, floorX, dropToy, pickupToy, dropHat, pickupHat, pickupLamp, dropLamp]);
 
   const handleKeyUp = useCallback((e: KeyboardEvent) => {
     if (e.key === 'ArrowLeft') {
@@ -318,22 +393,29 @@ export function useCatMovement(options: UseCatMovementOptions = {}) {
     floorX,
     carryingToy,
     wearingHat,
+    wearingLamp,
     currentTrackIndex,
     isNearToy: isNearToy(),
     isNearHat: isNearHat(),
+    isNearLamp: isNearLamp(),
     startPullup, // Add pullup trigger to state
     pickupToy,
     dropToy,
     pickupHat,
     dropHat,
+    pickupLamp,
+    dropLamp,
   } as CatState & { 
     currentTrackIndex: number | null;
     isNearToy: boolean;
     isNearHat: boolean;
+    isNearLamp: boolean;
     startPullup: boolean;
     pickupToy: () => void;
     dropToy: () => void;
     pickupHat: () => void;
     dropHat: () => void;
+    pickupLamp: () => void;
+    dropLamp: () => void;
   };
 }
