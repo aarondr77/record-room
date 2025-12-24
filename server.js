@@ -266,14 +266,30 @@ app.delete('/api/notes/:noteId', async (req, res) => {
 
 // Serve static files from Vite build in production
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, 'dist')));
-  // Fallback to index.html for client-side routing
-  app.get('*', (req, res) => {
-    // Don't serve static files for API routes
+  const distPath = path.join(__dirname, 'dist');
+  
+  // Serve static assets (JS, CSS, images, etc.) but NOT index.html
+  // Setting index: false prevents express.static from automatically serving index.html
+  app.use(express.static(distPath, {
+    index: false  // Don't auto-serve index.html - we'll handle it explicitly below
+  }));
+  
+  // Catch-all handler: serve index.html for all non-API routes
+  // This ensures React Router can handle client-side routes like /callback
+  app.get('*', (req, res, next) => {
+    // Skip API routes - they should return 404 if not found
     if (req.path.startsWith('/api')) {
       return res.status(404).json({ error: 'Not found' });
     }
-    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+    
+    // For all other routes (including /callback), serve index.html
+    // This allows React to load and handle the routing client-side
+    res.sendFile(path.join(distPath, 'index.html'), (err) => {
+      if (err) {
+        console.error('Error serving index.html:', err);
+        res.status(500).send('Error loading application');
+      }
+    });
   });
 }
 
