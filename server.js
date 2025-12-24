@@ -5,7 +5,6 @@ import multer from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import fs from 'fs';
 import { dbOperations, storageOperations } from './supabase.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -15,6 +14,10 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// CRITICAL: Trust Railway's reverse proxy
+// This ensures Express correctly handles X-Forwarded-* headers
+app.set('trust proxy', true);
 
 // Verify environment variables are loaded
 const clientId = process.env.VITE_SPOTIFY_CLIENT_ID;
@@ -52,39 +55,6 @@ app.use((req, res, next) => {
   console.log(`[Request] ${req.method} ${req.path}`);
   next();
 });
-
-// CRITICAL: Register /callback route VERY EARLY, before static file serving
-// This ensures Railway passes the request to Express instead of returning 404
-if (process.env.NODE_ENV === 'production') {
-  const distPath = path.join(__dirname, 'dist');
-  const indexPath = path.join(distPath, 'index.html');
-  
-  // Verify dist folder exists
-  if (!fs.existsSync(distPath)) {
-    console.error(`[ERROR] dist folder not found at: ${distPath}`);
-  } else {
-    console.log(`[Static] dist folder found at: ${distPath}`);
-    if (fs.existsSync(indexPath)) {
-      console.log(`[Static] index.html found`);
-    } else {
-      console.error(`[ERROR] index.html not found at: ${indexPath}`);
-    }
-  }
-  
-  app.get('/callback', (req, res) => {
-    console.log(`[Callback] ✅ Route hit! Query:`, Object.keys(req.query));
-    res.sendFile(indexPath, (err) => {
-      if (err) {
-        console.error('[Callback] ❌ Error serving index.html:', err);
-        if (!res.headersSent) {
-          res.status(500).send('Error loading application');
-        }
-      } else {
-        console.log(`[Callback] ✅ Successfully served index.html`);
-      }
-    });
-  });
-}
 
 // Spotify token exchange endpoint
 app.post('/api/token', async (req, res) => {
@@ -308,30 +278,20 @@ app.delete('/api/notes/:noteId', async (req, res) => {
 if (process.env.NODE_ENV === 'production') {
   const distPath = path.join(__dirname, 'dist');
   
-  // Step 1: Serve static assets (JS, CSS, images, etc.) but NOT index.html
-  // Static middleware will try to serve files, and if not found, calls next()
+  // Serve static assets (JS, CSS, images, etc.) but NOT index.html
   app.use(express.static(distPath, {
-    index: false  // Don't auto-serve index.html
+    index: false  // Don't auto-serve index.html - catch-all handles it
   }));
   
-  // Step 2: Catch-all handler for all non-API routes that don't match static files
-  // This ensures React Router can handle client-side routes
-  app.get('*', (req, res, next) => {
+  // Catch-all handler: serve index.html for all non-API routes
+  // This allows React Router to handle client-side routing (including /callback)
+  app.get('*', (req, res) => {
     // Skip API routes - they should return 404 if not found
     if (req.path.startsWith('/api')) {
       return res.status(404).json({ error: 'Not found' });
     }
     
-    // Skip /callback since we handle it explicitly above
-    if (req.path === '/callback') {
-      return next(); // Shouldn't reach here, but just in case
-    }
-    
-    // Log the request for debugging
-    console.log(`[Route] Serving index.html for: ${req.path} (method: ${req.method})`);
-    
-    // For all other routes, serve index.html
-    // This allows React to load and handle the routing client-side
+    // Serve index.html for all other routes (including /callback)
     const indexPath = path.join(distPath, 'index.html');
     res.sendFile(indexPath, (err) => {
       if (err) {
@@ -339,8 +299,6 @@ if (process.env.NODE_ENV === 'production') {
         if (!res.headersSent) {
           res.status(500).send('Error loading application');
         }
-      } else {
-        console.log(`[Route] Successfully served index.html for: ${req.path}`);
       }
     });
   });
