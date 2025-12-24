@@ -341,7 +341,7 @@ and us.
       
       {/* "Come in." as clickable link - positioned with blank line gap after main text */}
       <Text
-        position={[-LETTER_WIDTH / 2 + PADDING, LETTER_HEIGHT / 2 - PADDING - FONT_SIZE * 7.5, Z_FRONT + LETTER_DEPTH + 0.01]}
+        position={[-LETTER_WIDTH / 2 + PADDING, LETTER_HEIGHT / 2 - PADDING - FONT_SIZE * 7.5 - .2, Z_FRONT + LETTER_DEPTH + 0.01]}
         fontSize={FONT_SIZE}
         color={isHovered ? "#6B3410" : "#3D2817"}
         anchorX="left"
