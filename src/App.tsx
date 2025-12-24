@@ -1,16 +1,31 @@
 import { useState, useEffect, useRef } from 'react';
 import { LoginPage } from './pages/LoginPage';
 import { RoomPage } from './pages/RoomPage';
-import { getAuthUrl, getAccessTokenFromUrl, fetchUserProfile, fetchPlaylist } from './lib/spotify';
+import { LoadingScreen } from './components/ui/LoadingScreen';
+import { getAuthUrl, getAccessTokenFromUrl, fetchUserProfile } from './lib/spotify';
 import { usePlaylist } from './hooks/usePlaylist';
-import type { SpotifyUser, SpotifyPlaylist } from './types';
+import type { SpotifyUser } from './types';
 import './App.css';
 
 function App() {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<SpotifyUser | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [didAttemptProfile, setDidAttemptProfile] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [isLoginPageReady, setIsLoginPageReady] = useState(false);
   const isExchangingToken = useRef(false);
+
+  // Remove the initial HTML loading screen once React has mounted
+  useEffect(() => {
+    const initialLoader = document.getElementById('initial-loading');
+    if (initialLoader) {
+      initialLoader.style.opacity = '0';
+      initialLoader.style.transition = 'opacity 0.3s ease';
+      setTimeout(() => {
+        initialLoader.remove();
+      }, 300);
+    }
+  }, []);
 
   // Auth initialization
   useEffect(() => {
@@ -19,8 +34,8 @@ function App() {
       const code = urlParams.get('code');
 
       if (urlParams.get('error')) {
-        setError('Spotify authentication failed');
         window.history.replaceState({}, '', '/');
+        setIsInitializing(false);
         return;
       }
 
@@ -42,13 +57,16 @@ function App() {
               localStorage.setItem('current_user', JSON.stringify(profile));
             } catch (err) {
               console.error('Failed to fetch user profile:', err);
+              // Allow app to continue even if profile fetch fails
             }
+            setDidAttemptProfile(true);
           }
         } catch (err) {
-          setError(err instanceof Error ? err.message : 'Authentication failed');
+          console.error('Authentication failed:', err);
           localStorage.removeItem('spotify_access_token');
         } finally {
           isExchangingToken.current = false;
+          setIsInitializing(false);
         }
       } else {
         const savedToken = localStorage.getItem('spotify_access_token');
@@ -64,6 +82,9 @@ function App() {
             } catch (e) {
               console.error('Failed to parse saved user:', e);
             }
+            setDidAttemptProfile(true);
+            // Don't set isInitializing to false here - let it stay true until playlist loads
+            // This ensures loading screen shows while playlist is being fetched
           } else {
             // Fetch user profile if not saved
             fetchUserProfile(savedToken)
@@ -71,8 +92,23 @@ function App() {
                 setCurrentUser(profile);
                 localStorage.setItem('current_user', JSON.stringify(profile));
               })
-              .catch((err) => console.error('Failed to fetch user profile:', err));
+              .catch((err) => {
+                console.error('Failed to fetch user profile:', err);
+              })
+              .finally(() => {
+                setDidAttemptProfile(true);
+              });
+            // Don't set isInitializing to false here either - wait for playlist
           }
+        } else {
+          // No saved token - will show login page
+          // Allow LoginPage to render, but keep loading screen until 3D scene is ready
+          requestAnimationFrame(() => {
+            setIsLoginPageReady(true);
+          });
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/8154426d-abb8-4a21-a4ff-5fed9d597451',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'fix1',hypothesisId:'H5',location:'App.tsx:initAuth-no-token',message:'no token path, enabling login page',data:{},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
         }
       }
     };
@@ -84,26 +120,57 @@ function App() {
       const authUrl = await getAuthUrl();
       window.location.href = authUrl;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to initiate login');
+      console.error('Failed to initiate login:', err);
     }
   };
 
-  const { playlist, isLoading: isLoadingPlaylist, error: playlistError } = usePlaylist(accessToken);
+  const { playlist, error: playlistError, hasFetched } = usePlaylist(accessToken);
 
-  // Loading screen
-  if (!accessToken) {
-    return <LoginPage onLogin={handleLogin} />;
+  // Update isInitializing once we have everything we need, or if we know there's no token
+  useEffect(() => {
+    // If no access token, initialization is complete (will show login page)
+    if (!accessToken && !isInitializing) {
+      // Already handled in initAuth
+      return;
+    }
+    // If we have access token, wait for user and playlist fetch to complete
+    // hasFetched ensures we wait for the actual fetch to finish, not just initial state
+    if (accessToken && didAttemptProfile && hasFetched) {
+      setIsInitializing(false);
+    }
+  }, [accessToken, didAttemptProfile, hasFetched, isInitializing]);
+
+  // Show loading screen during initial auth check, token exchange, or while loading data
+  // Also show while LoginPage is preparing to render (3D scene loading)
+  if (accessToken && (isInitializing || isExchangingToken.current || !didAttemptProfile || !hasFetched)) {
+    const message = isExchangingToken.current || (accessToken && !didAttemptProfile) 
+      ? 'Loading...' 
+      : 'Loading your playlist...';
+    return <LoadingScreen message={message} />;
   }
 
-  if (!currentUser || isLoadingPlaylist) {
+  // Show login page if no access token
+  // But keep loading screen visible until 3D scene is ready
+  if (!accessToken) {
+    if (!isLoginPageReady) {
+      return <LoadingScreen message="Loading..." />;
+    }
     return (
-      <div className="app">
-        <div className="loading">
-          <div className="loading-heart">💕</div>
-          <p>Loading your playlist...</p>
-          {error && <p style={{ color: '#ff4444', marginTop: '20px' }}>{error}</p>}
-        </div>
-      </div>
+      <>
+        {isInitializing && <LoadingScreen message="Loading..." />}
+        <LoginPage 
+          onLogin={handleLogin} 
+          onSceneReady={() => {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/8154426d-abb8-4a21-a4ff-5fed9d597451',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H4',location:'App.tsx:onSceneReady',message:'login scene ready callback',data:{},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
+            // 3D scene is ready - hide loading screen after a brief delay to ensure smooth transition
+            setTimeout(() => {
+              setIsInitializing(false);
+            }, 200);
+          }}
+        />
+      </>
     );
   }
 
@@ -116,7 +183,6 @@ function App() {
           </p>
           <button
             onClick={() => {
-              setError(null);
               setAccessToken(null);
               localStorage.removeItem('spotify_access_token');
             }}
@@ -141,6 +207,11 @@ function App() {
         </div>
       </div>
     );
+  }
+
+  // At this point, currentUser is guaranteed to be non-null due to earlier checks
+  if (!currentUser) {
+    return <LoadingScreen />;
   }
 
   return (

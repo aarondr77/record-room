@@ -18,7 +18,7 @@
 2. Cat doing a pullup
 3. Cat laying on person's leg
 4. Eating salt 
-5. Mac Miller record
+5. Trophy case on the wall with framed gold medal
 
 
 

@@ -23,16 +23,13 @@ export function Lighting() {
   }, [scene]);
 
   return (
-    <>
-      {/* Lower ambient light to allow shadows to be more visible */}
-      <ambientLight intensity={0.2} color="#FFF8F5" />
-      
+    <>      
       {/* Key light: more centered and closer to wall for more direct lighting */}
       <directionalLight
         ref={directionalLightRef}
         position={[4, 6, 7]}
-        intensity={1.25}
-        color="#FFEDDE"
+        intensity={.8}
+        color="#debe87"
         castShadow
         shadow-mapSize-width={4096}
         shadow-mapSize-height={4096}
@@ -53,20 +50,6 @@ export function Lighting() {
         position={[-5, 4, 5]}
         intensity={0.18}
         color="#FFE8E0"
-      />
-      
-      {/* Soft overhead fill light */}
-      <directionalLight
-        position={[0, 8, 2]}
-        intensity={0.12}
-        color="#FFF5EE"
-      />
-      
-      {/* Subtle warm accent light from below */}
-      <directionalLight
-        position={[15, 5, 5]}
-        intensity={.5}
-        color="#ee2400"
       />
     </>
   );

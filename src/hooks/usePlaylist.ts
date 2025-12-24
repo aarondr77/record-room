@@ -6,10 +6,13 @@ export function usePlaylist(accessToken: string | null) {
   const [playlist, setPlaylist] = useState<SpotifyPlaylist | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Track if we've attempted a fetch - helps avoid race conditions
+  const [hasFetched, setHasFetched] = useState(false);
 
   useEffect(() => {
     if (!accessToken) {
       setPlaylist(null);
+      setHasFetched(false);
       return;
     }
 
@@ -26,9 +29,10 @@ export function usePlaylist(accessToken: string | null) {
       })
       .finally(() => {
         setIsLoading(false);
+        setHasFetched(true);
       });
   }, [accessToken]);
 
-  return { playlist, isLoading, error };
+  return { playlist, isLoading, error, hasFetched };
 }
 

@@ -15,8 +15,9 @@
 .notes-list {
   flex: 1;
   overflow-y: auto;
-  margin-bottom: var(--spacing-xl);
+  margin-bottom: var(--spacing-md);
   min-height: 0;
+  max-height: 450px;
   /* Handwritten notes layout - allow natural spacing */
   display: flex;
   flex-direction: column;

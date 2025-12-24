@@ -46,7 +46,7 @@ export function Record({ track, position, isHighlighted = false, onClick }: Reco
         castShadow
         receiveShadow
       >
-        <ringGeometry args={[0.9, 1.0, 64]} />
+        <ringGeometry args={[0.9, 1.0, 48]} />
         <meshStandardMaterial 
           color={isHighlighted ? "#FFD700" : "#2C2C2C"}
           metalness={0.8}
@@ -57,7 +57,7 @@ export function Record({ track, position, isHighlighted = false, onClick }: Reco
       {/* Highlight ring */}
       {isHighlighted && (
         <mesh position={[0, 0, 0.02]}>
-          <ringGeometry args={[1.0, 1.05, 64]} />
+          <ringGeometry args={[1.0, 1.05, 48]} />
           <meshStandardMaterial 
             color="#FFD700" 
             emissive="#FFD700"

@@ -3,9 +3,14 @@ import { CatmullRomCurve3, Color, ConeGeometry, CylinderGeometry, Euler, Group, 
 import { useFrame } from '@react-three/fiber';
 import { getPlatform } from '../../config/platforms';
 import type { CatState } from '../../types';
+import { FLOOR_Y, FLOOR_Z } from '../../types';
+import { WornBaseballHat } from './BaseballHat';
 
 interface PlaceholderCatProps {
   catState: CatState & { currentTrackIndex: number | null };
+  carryingToy?: boolean;
+  wearingHat?: boolean;
+  isPlaying?: boolean;
 }
 
 // Cat scale - sized to fit on shelf platforms (records are 2x2 units)
@@ -16,7 +21,6 @@ const JUMP_MIN_HEIGHT = 0.18;
 const JUMP_MAX_HEIGHT = 0.42;
 
 // Window hanging animation constants
-const WINDOW_PAUSE_DURATION = 1.0; // seconds to pause before swinging starts
 const WINDOW_TRANSITION_DURATION = 0.5; // seconds to transition into hanging pose
 
 function clamp01(v: number) {
@@ -85,19 +89,28 @@ const innerEarMaterial = new MeshStandardMaterial({
   metalness: 0.0,
 });
 
+// Material for carried toy (red lobster)
+const carriedToyMaterial = new MeshStandardMaterial({
+  color: new Color('#C41E3A'), // Deep red lobster color
+  roughness: 0.9,
+  metalness: 0.0,
+});
+
 // Create a sitting tuxedo cat model facing forward (+Z direction, toward camera)
 function createCatModel(): {
   group: Group;
   tail: Group | null;
-  body: Mesh;
-  head: Mesh;
+  bodyGroup: Group;
+  headGroup: Group;
   frontLegsGroup: Group;
   backLegsGroup: Group;
 } {
   const catGroup = new Group();
   let tailMesh: Group | null = null;
   
-  // Create groups for animatable leg parts
+  // Create groups for animatable parts - body parts move together, head parts move together
+  const bodyGroup = new Group();
+  const headGroup = new Group();
   const frontLegsGroup = new Group();
   const backLegsGroup = new Group();
   
@@ -109,7 +122,7 @@ function createCatModel(): {
   body.rotation.x = -0.15; // Slight tilt back for sitting pose
   body.castShadow = true;
   body.receiveShadow = true;
-  catGroup.add(body);
+  bodyGroup.add(body);
   
   // === CHEST/FRONT - WHITE (tuxedo marking) ===
   const chestGeometry = new SphereGeometry(0.13, 8, 6); // Minimal segments
@@ -117,7 +130,7 @@ function createCatModel(): {
   const chest = new Mesh(chestGeometry, whiteFurMaterial);
   chest.position.set(0, 0.1, 0.09);
   chest.castShadow = true;
-  catGroup.add(chest);
+  bodyGroup.add(chest);
   
   // === BELLY - WHITE (extends down from chest) ===
   const bellyGeometry = new SphereGeometry(0.1, 8, 6); // Minimal segments
@@ -125,7 +138,9 @@ function createCatModel(): {
   const belly = new Mesh(bellyGeometry, whiteFurMaterial);
   belly.position.set(0, -0.02, 0.06);
   belly.castShadow = true;
-  catGroup.add(belly);
+  bodyGroup.add(belly);
+  
+  catGroup.add(bodyGroup);
   
   // === HEAD - BLACK ===
   const headGeometry = new SphereGeometry(0.14, 10, 8); // Minimal segments
@@ -134,7 +149,7 @@ function createCatModel(): {
   head.position.set(0, 0.42, 0.08);
   head.castShadow = true;
   head.receiveShadow = true;
-  catGroup.add(head);
+  headGroup.add(head);
   
   // === MUZZLE (snout area) - WHITE (tuxedo marking) ===
   const muzzleGeometry = new SphereGeometry(0.065, 8, 6); // Minimal segments
@@ -142,14 +157,14 @@ function createCatModel(): {
   const muzzle = new Mesh(muzzleGeometry, whiteFurMaterial);
   muzzle.position.set(0, 0.37, 0.17);
   muzzle.castShadow = true;
-  catGroup.add(muzzle);
+  headGroup.add(muzzle);
   
   // === CHIN - WHITE (connects to chest) ===
   const chinGeometry = new SphereGeometry(0.04, 6, 6); // Minimal segments
   chinGeometry.scale(1.2, 1.0, 0.8);
   const chin = new Mesh(chinGeometry, whiteFurMaterial);
   chin.position.set(0, 0.32, 0.14);
-  catGroup.add(chin);
+  headGroup.add(chin);
   
   // === EARS (triangular, pointing up) - BLACK ===
   const earGeometry = new ConeGeometry(0.05, 0.1, 3); // Minimal segments (3 is minimum)
@@ -160,7 +175,7 @@ function createCatModel(): {
   leftEar.rotation.z = -0.25;
   leftEar.rotation.x = 0.1;
   leftEar.castShadow = true;
-  catGroup.add(leftEar);
+  headGroup.add(leftEar);
   
   // Left inner ear
   const innerEarGeometry = new ConeGeometry(0.03, 0.06, 3); // Minimal segments
@@ -168,7 +183,7 @@ function createCatModel(): {
   leftInnerEar.position.set(-0.08, 0.53, 0.06);
   leftInnerEar.rotation.z = -0.25;
   leftInnerEar.rotation.x = 0.1;
-  catGroup.add(leftInnerEar);
+  headGroup.add(leftInnerEar);
   
   // Right ear
   const rightEar = new Mesh(earGeometry, blackFurMaterial);
@@ -176,14 +191,14 @@ function createCatModel(): {
   rightEar.rotation.z = 0.25;
   rightEar.rotation.x = 0.1;
   rightEar.castShadow = true;
-  catGroup.add(rightEar);
+  headGroup.add(rightEar);
   
   // Right inner ear
   const rightInnerEar = new Mesh(innerEarGeometry, innerEarMaterial);
   rightInnerEar.position.set(0.08, 0.53, 0.06);
   rightInnerEar.rotation.z = 0.25;
   rightInnerEar.rotation.x = 0.1;
-  catGroup.add(rightInnerEar);
+  headGroup.add(rightInnerEar);
   
   // === EYES (almond-shaped with pupils) ===
   const eyeWhiteGeometry = new SphereGeometry(0.028, 8, 6); // Minimal segments
@@ -193,32 +208,34 @@ function createCatModel(): {
   const leftEyeWhite = new Mesh(eyeWhiteGeometry, eyeMaterial);
   leftEyeWhite.position.set(-0.05, 0.44, 0.16);
   leftEyeWhite.rotation.y = -0.2;
-  catGroup.add(leftEyeWhite);
+  headGroup.add(leftEyeWhite);
   
   // Left pupil (vertical slit)
   const pupilGeometry = new SphereGeometry(0.015, 4, 4); // Minimal segments
   pupilGeometry.scale(0.5, 1.2, 0.5);
   const leftPupil = new Mesh(pupilGeometry, pupilMaterial);
   leftPupil.position.set(-0.05, 0.44, 0.175);
-  catGroup.add(leftPupil);
+  headGroup.add(leftPupil);
   
   // Right eye
   const rightEyeWhite = new Mesh(eyeWhiteGeometry, eyeMaterial);
   rightEyeWhite.position.set(0.05, 0.44, 0.16);
   rightEyeWhite.rotation.y = 0.2;
-  catGroup.add(rightEyeWhite);
+  headGroup.add(rightEyeWhite);
   
   // Right pupil
   const rightPupil = new Mesh(pupilGeometry, pupilMaterial);
   rightPupil.position.set(0.05, 0.44, 0.175);
-  catGroup.add(rightPupil);
+  headGroup.add(rightPupil);
   
   // === NOSE (small triangle) - DARK ===
   const noseGeometry = new SphereGeometry(0.02, 4, 4); // Minimal segments
   noseGeometry.scale(1.2, 0.8, 0.8);
   const nose = new Mesh(noseGeometry, noseMaterial);
   nose.position.set(0, 0.39, 0.2);
-  catGroup.add(nose);
+  headGroup.add(nose);
+  
+  catGroup.add(headGroup);
   
   // === WHISKER MARKS (small bumps on muzzle) - WHITE ===
   // Removed whisker bumps for performance - they're very small and hard to see
@@ -322,16 +339,17 @@ function createCatModel(): {
   return {
     group: catGroup,
     tail: tailMesh,
-    body: body,
-    head: head,
+    bodyGroup: bodyGroup,
+    headGroup: headGroup,
     frontLegsGroup: frontLegsGroup,
     backLegsGroup: backLegsGroup,
   };
 }
 
-export function PlaceholderCat({ catState }: PlaceholderCatProps) {
+export function PlaceholderCat({ catState, carryingToy = false, wearingHat = false, isPlaying = false }: PlaceholderCatProps) {
   const catRef = useRef<Group>(null);
-  const { platform, recordIndex, facing, isMoving } = catState;
+  const hatRef = useRef<Group>(null);
+  const { platform, recordIndex, facing, isMoving, floorX } = catState;
 
   const jumpRef = useRef<{
     active: boolean;
@@ -355,7 +373,7 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
 
   // Window hanging animation state
   const windowHangRef = useRef<{
-    phase: 'none' | 'pausing' | 'transitioning' | 'swinging';
+    phase: 'none' | 'waiting' | 'transitioning' | 'swinging';
     landedTime: number; // When the cat landed on the window
     swingStartTime: number; // When swinging started
   }>({
@@ -368,15 +386,15 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
 
   // Create the procedural cat model and store refs
   const catModelData = useMemo(() => {
-    const { group, tail, body, head, frontLegsGroup, backLegsGroup } = createCatModel();
+    const { group, tail, bodyGroup, headGroup, frontLegsGroup, backLegsGroup } = createCatModel();
     
     // Apply scale
     group.scale.set(CAT_SCALE, CAT_SCALE, CAT_SCALE);
 
     // Capture base transforms for all animatable parts (following .cursorrules pattern)
     const tailBase = tail ? snapTransform(tail) : null;
-    const bodyBase = snapTransform(body);
-    const headBase = snapTransform(head);
+    const bodyGroupBase = snapTransform(bodyGroup);
+    const headGroupBase = snapTransform(headGroup);
     const frontLegsBase = snapTransform(frontLegsGroup);
     const backLegsBase = snapTransform(backLegsGroup);
     
@@ -384,10 +402,10 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
       group, 
       tail, 
       tailBase,
-      body,
-      bodyBase,
-      head,
-      headBase,
+      bodyGroup,
+      bodyGroupBase,
+      headGroup,
+      headGroupBase,
       frontLegsGroup,
       frontLegsBase,
       backLegsGroup,
@@ -399,10 +417,10 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
     group: catModel, 
     tail: tailMesh, 
     tailBase,
-    body,
-    bodyBase,
-    head,
-    headBase,
+    bodyGroup,
+    bodyGroupBase,
+    headGroup,
+    headGroupBase,
     frontLegsGroup,
     frontLegsBase,
     backLegsGroup,
@@ -412,10 +430,16 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
   const platformData = getPlatform(platform);
   if (!platformData) return null;
 
-  // Calculate cat position
+  // Calculate cat position based on platform type
   let catPosition = { ...platformData.position };
   
-  if (platformData.type === 'shelf' && recordIndex !== null && recordIndex < platformData.records.length) {
+  if (platformData.type === 'floor') {
+    // On floor: use floorX for continuous X position
+    // Floor Y and Z are fixed constants
+    catPosition.x = floorX;
+    catPosition.y = FLOOR_Y + 0.15; // Offset to sit on floor surface
+    catPosition.z = FLOOR_Z + 0.3; // Slightly in front of floor back edge
+  } else if (platformData.type === 'shelf' && recordIndex !== null && recordIndex < platformData.records.length) {
     // Position cat next to the current record on the shelf
     // Records are now 2x2 and spaced 2.2 apart
     const recordCount = platformData.records.length;
@@ -423,13 +447,24 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
     const totalWidth = (recordCount - 1) * RECORD_SPACING;
     const startOffset = -totalWidth / 2;
     catPosition.x += startOffset + recordIndex * RECORD_SPACING;
+    
+    // Position cat on the platform (platform is at y - 1.1 from record center)
+    // Adjust Y so the cat sits properly on the platform
+    catPosition.y = platformData.position.y - 1.1 + 0.15;
+    // Move cat forward (positive Z) so it's in front of the record, not behind
+    catPosition.z = platformData.position.z + 0.6;
+  } else if (platformData.type === 'window') {
+    // Window positioning
+    catPosition.y = platformData.position.y - 1.1 + 0.15;
+    catPosition.z = platformData.position.z + 0.6;
+  } else {
+    // Default shelf positioning without record
+    catPosition.y = platformData.position.y - 1.1 + 0.15;
+    catPosition.z = platformData.position.z + 0.6;
   }
-
-  // Position cat on the platform (platform is at y - 1.1 from record center)
-  // Adjust Y so the cat sits properly on the platform
-  catPosition.y = platformData.position.y - 1.1 + 0.15;
-  // Move cat forward (positive Z) so it's in front of the record, not behind
-  catPosition.z = platformData.position.z + 0.6;
+  
+  // Track if we're on the floor for special handling
+  const isOnFloor = platformData.type === 'floor';
 
   // Initialize position on mount - set to current target
   const isInitializedRef = useRef(false);
@@ -438,8 +473,11 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
       const initialPos = new Vector3(catPosition.x, catPosition.y, catPosition.z);
       catRef.current.position.copy(initialPos);
       // Set initial rotation based on facing direction
-      const baseYaw = 0; // cat model faces +Z by default
-      catRef.current.rotation.y = facing === 'left' ? baseYaw + Math.PI / 2 : baseYaw - Math.PI / 2;
+      // Cat model faces +Z by default. In Three.js right-handed coordinates:
+      // - Negative Y rotation turns to face -X (left)
+      // - Positive Y rotation turns to face +X (right)
+      const baseYaw = 0;
+      catRef.current.rotation.y = facing === 'left' ? baseYaw - Math.PI / 2 : baseYaw + Math.PI / 2;
       jumpRef.current.lastTarget = initialPos.clone();
       jumpRef.current.startRotationY = catRef.current.rotation.y;
       jumpRef.current.targetRotationY = catRef.current.rotation.y;
@@ -447,7 +485,11 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
     }
   }, [catPosition.x, catPosition.y, catPosition.z, facing]);
 
+  // Track previous platform for detecting floor-to-platform or platform-to-floor transitions
+  const prevPlatformRef = useRef<number>(platform);
+  
   // Start a jump whenever the target position changes (platform jump OR record move).
+  // Skip jump animation for continuous floor movement.
   useEffect(() => {
     if (!isInitializedRef.current) return; // Wait for initialization
     
@@ -457,15 +499,34 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
     
     if (!last) {
       jump.lastTarget = target.clone();
+      prevPlatformRef.current = platform;
       return;
     }
     
-    if (last.distanceTo(target) < 0.0001) return;
+    if (last.distanceTo(target) < 0.0001) {
+      prevPlatformRef.current = platform;
+      return;
+    }
 
     // CRITICAL: Use the ACTUAL current position, not the last target
     // This ensures we jump from where the cat actually is, not where it should be
     const currentPos = catRef.current?.position?.clone();
     if (!currentPos) return;
+    
+    // Check if this is continuous floor movement (same floor platform, just X changed)
+    const wasOnFloor = getPlatform(prevPlatformRef.current)?.type === 'floor';
+    const isNowOnFloor = platformData.type === 'floor';
+    const platformChanged = platform !== prevPlatformRef.current;
+    
+    // Update platform tracking
+    prevPlatformRef.current = platform;
+    
+    // Skip jump animation for continuous floor walking (no platform change, just X movement)
+    if (wasOnFloor && isNowOnFloor && !platformChanged) {
+      // Just update the target position, no jump animation
+      jump.lastTarget = target.clone();
+      return;
+    }
     
     // Calculate jump direction to determine target rotation
     const jumpDir = new Vector3().subVectors(target, currentPos).normalize();
@@ -491,8 +552,11 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
 
     const dist = currentPos.distanceTo(target);
     // Height scales with distance, clamped so short hops still read.
-    jump.height = Math.max(JUMP_MIN_HEIGHT, Math.min(JUMP_MAX_HEIGHT, 0.12 + dist * 0.35));
-  }, [platform, recordIndex, catPosition.x, catPosition.y, catPosition.z]);
+    // For floor jumps (up/down), use more height
+    const isVerticalJump = Math.abs(target.y - currentPos.y) > 0.5;
+    const baseHeight = isVerticalJump ? 0.3 : 0.12;
+    jump.height = Math.max(JUMP_MIN_HEIGHT, Math.min(JUMP_MAX_HEIGHT, baseHeight + dist * 0.35));
+  }, [platform, recordIndex, catPosition.x, catPosition.y, catPosition.z, platformData.type]);
 
   // Animation and movement
   useFrame((state) => {
@@ -526,9 +590,12 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
         }
         
         // Face the correct direction when not jumping
-        const baseYaw = 0; // cat model faces +Z by default
+        // Cat model faces +Z by default. In Three.js right-handed coordinates:
+        // - Negative Y rotation turns to face -X (left)
+        // - Positive Y rotation turns to face +X (right)
+        const baseYaw = 0;
         if (!jump.active) {
-          catRef.current.rotation.y = facing === 'left' ? baseYaw + Math.PI / 2 : baseYaw - Math.PI / 2;
+          catRef.current.rotation.y = facing === 'left' ? baseYaw - Math.PI / 2 : baseYaw + Math.PI / 2;
         }
 
         // World-space arc path (only during leap phase)
@@ -542,10 +609,10 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
 
         // === BODY ANIMATION ===
         // Reset to base before applying relative changes (following .cursorrules)
-        body.position.copy(bodyBase.pos);
-        body.rotation.copy(bodyBase.rot);
-        head.position.copy(headBase.pos);
-        head.rotation.copy(headBase.rot);
+        bodyGroup.position.copy(bodyGroupBase.pos);
+        bodyGroup.rotation.copy(bodyGroupBase.rot);
+        headGroup.position.copy(headGroupBase.pos);
+        headGroup.rotation.copy(headGroupBase.rot);
         frontLegsGroup.position.copy(frontLegsBase.pos);
         frontLegsGroup.rotation.copy(frontLegsBase.rot);
         backLegsGroup.position.copy(backLegsBase.pos);
@@ -558,8 +625,8 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
           const crouchAmount = crouchT * 0.15; // Ramp up and hold
           
           // Lower body and compress legs for the crouch
-          body.position.y -= crouchAmount * 0.5;
-          body.rotation.x += crouchAmount * 0.8; // Body hunches forward
+          bodyGroup.position.y -= crouchAmount * 0.5;
+          bodyGroup.rotation.x += crouchAmount * 0.8; // Body hunches forward
           
           // Legs bend (lower position, rotate to show bend)
           frontLegsGroup.position.y -= crouchAmount * 0.3;
@@ -568,8 +635,8 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
           backLegsGroup.rotation.x += crouchAmount * 2.5;
           
           // Head tilts down to look at landing spot
-          head.position.y -= crouchAmount * 0.2;
-          head.rotation.x += crouchAmount * 1.2;
+          headGroup.position.y -= crouchAmount * 0.2;
+          headGroup.rotation.x += crouchAmount * 1.2;
           
         } else if (t < LAND_PHASE) {
           // === LEAP PHASE: Body stretches out during arc ===
@@ -587,12 +654,12 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
             ? leapEased * 0.4  // Tilt forward during ascent
             : 0.4 - (leapT - 0.5) * 2 * 0.5; // Tilt back during descent
           
-          body.position.y -= remainingCrouch * 0.3;
-          body.rotation.x -= bodyTilt;
+          bodyGroup.position.y -= remainingCrouch * 0.3;
+          bodyGroup.rotation.x -= bodyTilt;
           
           // Head follows body, looking ahead during leap
-          head.rotation.x -= bodyTilt * 0.8;
-          head.position.y += arcPhase * 0.05; // Slight head lift at peak
+          headGroup.rotation.x -= bodyTilt * 0.8;
+          headGroup.position.y += arcPhase * 0.05; // Slight head lift at peak
           
           // Legs extend during leap (stretch out behind and in front)
           const legExtension = arcPhase * 0.12;
@@ -613,8 +680,8 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
           const impactCompression = impactCurve * 0.12;
           
           // Body compresses on impact
-          body.position.y -= impactCompression * 0.4;
-          body.rotation.x += impactCompression * 0.3; // Slight forward hunch on impact
+          bodyGroup.position.y -= impactCompression * 0.4;
+          bodyGroup.rotation.x += impactCompression * 0.3; // Slight forward hunch on impact
           
           // Legs compress to absorb shock
           frontLegsGroup.position.y -= impactCompression * 0.5;
@@ -623,8 +690,8 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
           backLegsGroup.rotation.x += impactCompression * 2;
           
           // Head dips on impact
-          head.position.y -= impactCompression * 0.15;
-          head.rotation.x += impactCompression * 0.5;
+          headGroup.position.y -= impactCompression * 0.15;
+          headGroup.rotation.x += impactCompression * 0.5;
         }
 
         // Tail whips more during jump
@@ -643,9 +710,9 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
           // Keep the rotation at the landing direction (don't reset it)
           // The rotation is already set to jump.targetRotationY, so we preserve it
           
-          // If landing on window, start the pause phase
+          // If landing on window, start the waiting phase (waiting for user to press Space)
           if (platformData.type === 'window') {
-            windowHangRef.current.phase = 'pausing';
+            windowHangRef.current.phase = 'waiting';
             windowHangRef.current.landedTime = state.clock.elapsedTime;
           } else {
             windowHangRef.current.phase = 'none';
@@ -657,12 +724,12 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
             tailMesh.rotation.copy(tailBase.rot);
             tailMesh.scale.copy(tailBase.scale);
           }
-          body.position.copy(bodyBase.pos);
-          body.rotation.copy(bodyBase.rot);
-          body.scale.copy(bodyBase.scale);
-          head.position.copy(headBase.pos);
-          head.rotation.copy(headBase.rot);
-          head.scale.copy(headBase.scale);
+          bodyGroup.position.copy(bodyGroupBase.pos);
+          bodyGroup.rotation.copy(bodyGroupBase.rot);
+          bodyGroup.scale.copy(bodyGroupBase.scale);
+          headGroup.position.copy(headGroupBase.pos);
+          headGroup.rotation.copy(headGroupBase.rot);
+          headGroup.scale.copy(headGroupBase.scale);
           frontLegsGroup.position.copy(frontLegsBase.pos);
           frontLegsGroup.rotation.copy(frontLegsBase.rot);
           frontLegsGroup.scale.copy(frontLegsBase.scale);
@@ -678,14 +745,20 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
         const isOnWindow = platformData.type === 'window';
         
         // === WINDOW HANGING ANIMATION ===
+        // Check if pullup was triggered (via catState.startPullup)
+        const shouldStartPullup = (catState as any).startPullup === true;
+        const prevStartPullup = (windowHangRef.current as any).prevStartPullup ?? false;
+        
+        if (isOnWindow && windowHang.phase === 'waiting' && shouldStartPullup && !prevStartPullup) {
+          // User pressed Space, start the pullup animation
+          windowHang.phase = 'transitioning';
+          windowHang.swingStartTime = state.clock.elapsedTime;
+          (windowHangRef.current as any).prevStartPullup = true;
+        }
+        
         if (isOnWindow && windowHang.phase !== 'none') {
-          const timeSinceLanding = state.clock.elapsedTime - windowHang.landedTime;
-          
           // Phase transitions
-          if (windowHang.phase === 'pausing' && timeSinceLanding >= WINDOW_PAUSE_DURATION) {
-            windowHang.phase = 'transitioning';
-            windowHang.swingStartTime = state.clock.elapsedTime;
-          } else if (windowHang.phase === 'transitioning') {
+          if (windowHang.phase === 'transitioning') {
             const transitionT = (state.clock.elapsedTime - windowHang.swingStartTime) / WINDOW_TRANSITION_DURATION;
             if (transitionT >= 1) {
               windowHang.phase = 'swinging';
@@ -693,12 +766,12 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
           }
           
           // Reset to base before applying hanging pose
-          body.position.copy(bodyBase.pos);
-          body.rotation.copy(bodyBase.rot);
-          body.scale.copy(bodyBase.scale);
-          head.position.copy(headBase.pos);
-          head.rotation.copy(headBase.rot);
-          head.scale.copy(headBase.scale);
+          bodyGroup.position.copy(bodyGroupBase.pos);
+          bodyGroup.rotation.copy(bodyGroupBase.rot);
+          bodyGroup.scale.copy(bodyGroupBase.scale);
+          headGroup.position.copy(headGroupBase.pos);
+          headGroup.rotation.copy(headGroupBase.rot);
+          headGroup.scale.copy(headGroupBase.scale);
           frontLegsGroup.position.copy(frontLegsBase.pos);
           frontLegsGroup.rotation.copy(frontLegsBase.rot);
           frontLegsGroup.scale.copy(frontLegsBase.scale);
@@ -711,11 +784,11 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
             tailMesh.scale.copy(tailBase.scale);
           }
           
-          if (windowHang.phase === 'pausing') {
-            // Just sitting normally during pause, maybe looking around
+          if (windowHang.phase === 'waiting') {
+            // Waiting for user to press Space - just sitting normally, maybe looking around
             const lookTime = state.clock.elapsedTime * 1.5;
-            head.rotation.y += Math.sin(lookTime) * 0.2; // Look left and right
-            head.rotation.x -= 0.1; // Look up at window
+            headGroup.rotation.y += Math.sin(lookTime) * 0.2; // Look left and right
+            headGroup.rotation.x -= 0.1; // Look up at window
             
             // Tail sways gently
             if (tailMesh) {
@@ -737,9 +810,9 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
             
             // === HANGING POSE ===
             // Body hangs down and slightly forward
-            body.rotation.x -= transitionT * 0.25;
-            body.position.y -= transitionT * 0.05;
-            body.position.z += transitionT * 0.03;
+            bodyGroup.rotation.x -= transitionT * 0.25;
+            bodyGroup.position.y -= transitionT * 0.05;
+            bodyGroup.position.z += transitionT * 0.03;
             
             // Front legs reach up above head (holding window frame)
             // Scale legs longer so they can reach above head while staying attached
@@ -762,8 +835,8 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
             backLegsGroup.scale.set(1, 1 + transitionT * 0.3, 1);
             
             // Head tilts up to look at paws/window frame
-            head.rotation.x -= transitionT * 0.5;
-            head.position.y += transitionT * 0.03;
+            headGroup.rotation.x -= transitionT * 0.5;
+            headGroup.position.y += transitionT * 0.03;
             
             // Tail hangs down
             if (tailMesh) {
@@ -793,7 +866,7 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
               }
               
               // Head sways slightly
-              head.rotation.z += swingAmount * 0.1;
+              headGroup.rotation.z += swingAmount * 0.1;
             }
           }
           
@@ -806,22 +879,41 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
           // Reset window hang state when not on window
           if (!isOnWindow) {
             windowHang.phase = 'none';
+            (windowHangRef.current as any).prevStartPullup = false;
+          } else if (isOnWindow && !shouldStartPullup) {
+            // Reset the pullup trigger flag when it's cleared
+            (windowHangRef.current as any).prevStartPullup = false;
           }
           
-          // Not jumping: only lerp if we're close to target (to avoid interfering with jump start)
-          const distToTarget = catRef.current.position.distanceTo(targetPos);
-          if (distToTarget > 0.01) {
-            // Only lerp if we're not already very close (prevents fighting with jump animation)
-            catRef.current.position.lerp(targetPos, 0.18);
+          // Update rotation based on facing direction (for floor movement)
+          // Cat model faces +Z by default. In Three.js right-handed coordinates:
+          // - Negative Y rotation turns to face -X (left)
+          // - Positive Y rotation turns to face +X (right)
+          const baseYaw = 0;
+          const targetRotation = facing === 'left' ? baseYaw - Math.PI / 2 : baseYaw + Math.PI / 2;
+          // Smoothly interpolate rotation
+          catRef.current.rotation.y += (targetRotation - catRef.current.rotation.y) * 0.15;
+          
+          // Handle floor walking - smooth position updates
+          if (isOnFloor) {
+            // Faster lerp for responsive floor movement
+            catRef.current.position.lerp(targetPos, 0.25);
+          } else {
+            // Not jumping: only lerp if we're close to target (to avoid interfering with jump start)
+            const distToTarget = catRef.current.position.distanceTo(targetPos);
+            if (distToTarget > 0.01) {
+              // Only lerp if we're not already very close (prevents fighting with jump animation)
+              catRef.current.position.lerp(targetPos, 0.18);
+            }
           }
 
           // Reset all parts to base transforms (following .cursorrules)
-          body.position.copy(bodyBase.pos);
-          body.rotation.copy(bodyBase.rot);
-          body.scale.copy(bodyBase.scale);
-          head.position.copy(headBase.pos);
-          head.rotation.copy(headBase.rot);
-          head.scale.copy(headBase.scale);
+          bodyGroup.position.copy(bodyGroupBase.pos);
+          bodyGroup.rotation.copy(bodyGroupBase.rot);
+          bodyGroup.scale.copy(bodyGroupBase.scale);
+          headGroup.position.copy(headGroupBase.pos);
+          headGroup.rotation.copy(headGroupBase.rot);
+          headGroup.scale.copy(headGroupBase.scale);
           frontLegsGroup.position.copy(frontLegsBase.pos);
           frontLegsGroup.rotation.copy(frontLegsBase.rot);
           frontLegsGroup.scale.copy(frontLegsBase.scale);
@@ -829,13 +921,75 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
           backLegsGroup.rotation.copy(backLegsBase.rot);
           backLegsGroup.scale.copy(backLegsBase.scale);
 
+          // Walking animation when moving on floor
+          if (isOnFloor && isMoving) {
+            const walkSpeed = 8;
+            const walkTime = state.clock.elapsedTime * walkSpeed;
+            
+            // Leg animation - alternating front/back
+            const legSwing = Math.sin(walkTime) * 0.3;
+            frontLegsGroup.rotation.x += legSwing;
+            backLegsGroup.rotation.x -= legSwing;
+            
+            // Slight body bob
+            bodyGroup.position.y += Math.abs(Math.sin(walkTime * 2)) * 0.02;
+            
+            // Head bob
+            headGroup.position.y += Math.abs(Math.sin(walkTime * 2 + 0.5)) * 0.01;
+          }
+          
+          // === DANCING ANIMATION (when music is playing and cat is still) ===
+          const isDancing = isPlaying && !isMoving;
+          if (isDancing) {
+            const danceSpeed = 5.0; // Upbeat rhythm
+            const danceTime = state.clock.elapsedTime * danceSpeed;
+            
+            // Body bounces up and down to the beat - more pronounced
+            const bounce = Math.abs(Math.sin(danceTime)) * 0.07;
+            bodyGroup.position.y += bounce;
+            
+            // Body sways side to side - bigger sway
+            const sway = Math.sin(danceTime * 0.5) * 0.12;
+            bodyGroup.rotation.z += sway;
+            bodyGroup.position.x += sway * 0.2;
+            
+            // Head bobs independently - more exaggerated and off-beat for personality
+            const headBobSpeed = danceSpeed * 1.3; // Slightly faster than body
+            const headBobTime = state.clock.elapsedTime * headBobSpeed;
+            headGroup.position.y += Math.abs(Math.sin(headBobTime)) * 0.06; // Big vertical bob
+            headGroup.rotation.z += Math.sin(headBobTime * 0.6) * 0.18; // Tilt side to side
+            headGroup.rotation.y += Math.sin(danceTime * 0.35) * 0.25; // Look around more
+            headGroup.rotation.x += Math.sin(headBobTime * 0.8) * 0.1; // Nod forward/back
+            
+            // Front paws tap alternately - more visible
+            const tapPhase = Math.sin(danceTime);
+            const leftPawTap = Math.max(0, tapPhase) * 0.12;
+            const rightPawTap = Math.max(0, -tapPhase) * 0.12;
+            frontLegsGroup.rotation.x += (leftPawTap - rightPawTap) * 0.8;
+            frontLegsGroup.position.y += Math.abs(Math.sin(danceTime * 2)) * 0.025;
+            
+            // Back haunches bounce with the groove
+            backLegsGroup.position.y += bounce * 0.6;
+            backLegsGroup.rotation.x += Math.sin(danceTime) * 0.08;
+          }
+
           // Idle tail sway + breathing
           if (tailMesh && tailBase) {
             tailMesh.position.copy(tailBase.pos);
             tailMesh.rotation.copy(tailBase.rot);
             tailMesh.scale.copy(tailBase.scale);
 
-            if (isMoving) {
+            if (isDancing) {
+              // When dancing, wild enthusiastic tail wagging
+              const danceSpeed = 5.0;
+              const danceTime = state.clock.elapsedTime * danceSpeed;
+              const amp = 1.2; // Big dramatic swings
+              tailMesh.rotation.y += Math.sin(danceTime * 2.0) * amp; // Fast side-to-side
+              tailMesh.rotation.x += Math.sin(danceTime * 1.2) * (amp * 0.5); // Up and down
+              tailMesh.rotation.z += Math.sin(danceTime * 0.8) * 0.5; // Twisting motion
+              // Add a little "wag" offset for extra flair
+              tailMesh.position.x += Math.sin(danceTime * 2.0) * 0.03;
+            } else if (isMoving) {
               // When moving, smaller faster sway
               const amp = 0.35;
               const spd = 4.5;
@@ -854,6 +1008,26 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
           catModel.scale.set(CAT_SCALE * breathScale, CAT_SCALE, CAT_SCALE * breathScale);
         }
       }
+      
+      // === HAT SYNC: Make hat follow the head group's transforms ===
+      if (hatRef.current && wearingHat) {
+        // Sync hat rotation with head group (so hat tilts with head)
+        hatRef.current.rotation.copy(headGroup.rotation);
+        // Position hat to sit on top of head (not floating)
+        // Head center is at (0, 0.42, 0.08) in headGroup's local space
+        // Head radius is ~0.14, so top of head is at y ≈ 0.56
+        // Hat should sit lower, with the sweatband fitting around the head
+        const headLocalY = 0.42; // Head center Y in headGroup space
+        const headLocalZ = 0.08; // Head center Z in headGroup space
+        const headRadius = 0.14; // Approximate head radius
+        // Position hat so it sits on the head (sweatband fits around top of head)
+        // Use a smaller offset so hat doesn't float
+        hatRef.current.position.set(
+          headGroup.position.x,
+          headGroup.position.y + headLocalY + headRadius * 0.6 + 0.1, // Sit on head, not floating
+          headGroup.position.z + headLocalZ - 0.01 // Slightly back so brim extends backward
+        );
+      }
     }
   });
 
@@ -862,6 +1036,10 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
     return [catPosition.x, catPosition.y, catPosition.z] as [number, number, number];
   }, []); // Only set once on mount
 
+  // Mouth position for carrying toy (relative to cat group, adjusted for scale)
+  // Cat head is at y=0.42, muzzle at z=0.17, so mouth is slightly below and forward
+  const mouthPosition: [number, number, number] = [0, 0.32, 0.25];
+
   return (
     <group ref={catRef} position={initialPosition}>
       <primitive 
@@ -869,6 +1047,38 @@ export function PlaceholderCat({ catState }: PlaceholderCatProps) {
         castShadow 
         receiveShadow
       />
+      {/* Render simplified lobster in mouth when carrying */}
+      {carryingToy && (
+        <group position={mouthPosition} rotation={[0, Math.PI / 2, 0]} scale={0.22}>
+          {/* Simplified lobster body */}
+          <mesh castShadow>
+            <sphereGeometry args={[0.4, 8, 6]} />
+            <primitive object={carriedToyMaterial} attach="material" />
+          </mesh>
+          {/* Left claw */}
+          <mesh position={[-0.5, 0, 0.3]} castShadow>
+            <sphereGeometry args={[0.2, 6, 4]} />
+            <primitive object={carriedToyMaterial} attach="material" />
+          </mesh>
+          {/* Right claw */}
+          <mesh position={[0.5, 0, 0.3]} castShadow>
+            <sphereGeometry args={[0.2, 6, 4]} />
+            <primitive object={carriedToyMaterial} attach="material" />
+          </mesh>
+          {/* Tail */}
+          <mesh position={[0, 0, -0.5]} castShadow>
+            <sphereGeometry args={[0.25, 6, 4]} />
+            <primitive object={carriedToyMaterial} attach="material" />
+          </mesh>
+        </group>
+      )}
+      {/* Render baseball hat on head when wearing */}
+      {/* Hat ref is synced with headGroup transforms in useFrame */}
+      {wearingHat && (
+        <group ref={hatRef}>
+          <WornBaseballHat />
+        </group>
+      )}
     </group>
   );
 }
