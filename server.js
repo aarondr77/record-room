@@ -5,6 +5,7 @@ import multer from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 import { dbOperations, storageOperations } from './supabase.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -51,6 +52,39 @@ app.use((req, res, next) => {
   console.log(`[Request] ${req.method} ${req.path}`);
   next();
 });
+
+// CRITICAL: Register /callback route VERY EARLY, before static file serving
+// This ensures Railway passes the request to Express instead of returning 404
+if (process.env.NODE_ENV === 'production') {
+  const distPath = path.join(__dirname, 'dist');
+  const indexPath = path.join(distPath, 'index.html');
+  
+  // Verify dist folder exists
+  if (!fs.existsSync(distPath)) {
+    console.error(`[ERROR] dist folder not found at: ${distPath}`);
+  } else {
+    console.log(`[Static] dist folder found at: ${distPath}`);
+    if (fs.existsSync(indexPath)) {
+      console.log(`[Static] index.html found`);
+    } else {
+      console.error(`[ERROR] index.html not found at: ${indexPath}`);
+    }
+  }
+  
+  app.get('/callback', (req, res) => {
+    console.log(`[Callback] ✅ Route hit! Query:`, Object.keys(req.query));
+    res.sendFile(indexPath, (err) => {
+      if (err) {
+        console.error('[Callback] ❌ Error serving index.html:', err);
+        if (!res.headersSent) {
+          res.status(500).send('Error loading application');
+        }
+      } else {
+        console.log(`[Callback] ✅ Successfully served index.html`);
+      }
+    });
+  });
+}
 
 // Spotify token exchange endpoint
 app.post('/api/token', async (req, res) => {
@@ -273,22 +307,6 @@ app.delete('/api/notes/:noteId', async (req, res) => {
 // Serve static files from Vite build in production
 if (process.env.NODE_ENV === 'production') {
   const distPath = path.join(__dirname, 'dist');
-  
-  // Explicitly handle /callback route to ensure it works
-  app.get('/callback', (req, res) => {
-    console.log(`[Callback] Explicit /callback route hit with query:`, req.query);
-    const indexPath = path.join(distPath, 'index.html');
-    res.sendFile(indexPath, (err) => {
-      if (err) {
-        console.error('Error serving index.html for /callback:', err);
-        if (!res.headersSent) {
-          res.status(500).send('Error loading application');
-        }
-      } else {
-        console.log(`[Callback] Successfully served index.html`);
-      }
-    });
-  });
   
   // Step 1: Serve static assets (JS, CSS, images, etc.) but NOT index.html
   // Static middleware will try to serve files, and if not found, calls next()
